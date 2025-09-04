@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>管理后台</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", sans-serif; margin: 24px; color:#222;}
+    h1 { margin-bottom: 16px; }
+    .card { border:1px solid #e5e7eb; border-radius:12px; padding:16px; margin-bottom:16px; box-shadow:0 1px 2px rgba(0,0,0,.04);}
+    .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    label { font-size:14px; color:#555; }
+    input, select { padding:8px 10px; border:1px solid #d1d5db; border-radius:8px; outline:none; }
+    input:focus, select:focus { border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,.15); }
+    button { padding:8px 12px; border:1px solid #111827; border-radius:10px; background:#111827; color:#fff; cursor:pointer; }
+    button.ghost { background:#fff; color:#111827; }
+    button:hover { opacity:.9; }
+    nav button { margin-right:8px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+    th, td { border: 1px solid #e5e7eb; padding: 10px; text-align: left; }
+    th { background: #f9fafb; }
+    .tabs { margin-bottom: 12px; }
+    .muted { color:#6b7280; font-size: 13px;}
+    .danger { background:#ef4444; border-color:#ef4444; }
+  </style>
+</head>
+<body>
+  <h1>管理后台</h1>
+
+  <!-- 登录卡片 -->
+  <div class="card" id="loginCard">
+    <div class="row">
+      <label>用户名</label>
+      <input id="username" value="admin" />
+      <label>密码</label>
+      <input id="password" type="password" value="admin123" />
+      <button onclick="login()">登录</button>
+      <span class="muted" id="loginStatus"></span>
+    </div>
+  </div>
+
+  <!-- 顶部操作 -->
+  <div class="card" id="topBar" style="display:none;">
+    <div class="row">
+      <div class="muted">当前用户：<span id="meName"></span>（<span id="meRole"></span>）</div>
+      <button class="ghost" onclick="logout()">退出</button>
+    </div>
+  </div>
+
+  <!-- Tab 导航 -->
+  <div class="tabs" id="tabs" style="display:none;">
+    <button onclick="showTab('productsTab')">商品管理</button>
+    <button onclick="showTab('unitsTab')">单位管理</button>
+  </div>
+
+  <!-- 商品管理 -->
+  <div id="productsTab" class="card" style="display:none;">
+    <h2>商品列表</h2>
+    <table id="productsTable">
+      <thead>
+        <tr>
+          <th style="width:64px;">ID</th>
+          <th>SKU</th>
+          <th>商品名</th>
+          <th>厂家</th>
+          <th style="width:120px;">价格</th>
+          <th style="width:140px;">单位</th>
+          <th style="width:120px;">操作</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h3 style="margin-top:16px;">添加商品</h3>
+    <div class="row">
+      <input id="pSku" placeholder="SKU" />
+      <input id="pName" placeholder="商品名" />
+      <input id="pManu" placeholder="厂家" />
+      <input id="pPrice" placeholder="价格" type="number" step="0.01" />
+      <select id="pUnit"></select>
+      <button onclick="addProduct()">添加</button>
+    </div>
+    <div class="muted">提示：单位下拉来自单位管理表；删除商品不会影响单位。</div>
+  </div>
+
+  <!-- 单位管理 -->
+  <div id="unitsTab" class="card" style="display:none;">
+    <h2>单位列表</h2>
+    <table id="unitsTable">
+      <thead>
+        <tr>
+          <th style="width:64px;">ID</th>
+          <th>单位名</th>
+          <th style="width:120px;">操作</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h3 style="margin-top:16px;">添加单位</h3>
+    <div class="row">
+      <input id="uName" placeholder="单位名，如：条 / 盒 / 箱" />
+      <button onclick="addUnit()">添加</button>
+    </div>
+    <div class="muted">删除单位前请确认没有商品正在引用该单位。</div>
+  </div>
+
+<script>
+  // ====== 基础工具 ======
+  function setAuthHeader(headers = {}) {
+    const t = localStorage.getItem('token');
+    return t ? { ...headers, 'Authorization': 'Bearer ' + t } : headers;
+  }
+
+  async function api(path, opts = {}) {
+    const res = await fetch(path, {
+      ...opts,
+      headers: setAuthHeader({
+        'Content-Type': (opts.headers && opts.headers['Content-Type']) || 'application/json',
+        ...(opts.headers || {}),
+      })
+    });
+    if (res.status === 401) throw new Error('未登录或登录已过期');
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error('HTTP ' + res.status + ': ' + txt);
+    }
+    const ct = res.headers.get('content-type') || '';
+    return ct.includes('application/json') ? res.json() : res.text();
+  }
+
+  // ====== 登录 / 登出 ======
+  async function login() {
+    const u = document.getElementById('username').value.trim();
+    const p = document.getElementById('password').value.trim();
+    document.getElementById('loginStatus').textContent = '登录中…';
+    const form = new URLSearchParams({ username: u, password: p });
+    const res = await fetch('/api/auth/login', { method: 'POST', body: form });
+    if (!res.ok) {
+      document.getElementById('loginStatus').textContent = '登录失败';
+      alert('登录失败');
+      return;
+    }
+    const data = await res.json();
+    localStorage.setItem('token', data.access_token);
+    document.getElementById('loginStatus').textContent = '登录成功';
+    await postLoginInit();
+  }
+
+  function logout() {
+    localStorage.removeItem('token');
+    location.reload();
+  }
+
+  async function postLoginInit() {
+    // 展示顶部用户信息、tab
+    document.getElementById('loginCard').style.display = 'none';
+    document.getElementById('topBar').style.display = 'block';
+    document.getElementById('tabs').style.display = 'block';
+
+    // 拉取当前用户
+    const me = await api('/api/me');
+    document.getElementById('meName').textContent = me.username;
+    document.getElementById('meRole').textContent = me.is_admin ? '管理员' : '用户';
+
+    // 初始化单位/商品
+    showTab('unitsTab');
+    await loadUnits(); // 先加载单位，填充商品下拉
+    showTab('productsTab');
+    await loadProducts();
+  }
+
+  // 初始：如果已有 token，直接尝试初始化
+  (async () => {
+    const t = localStorage.getItem('token');
+    if (t) {
+      try { await postLoginInit(); } catch { /* token 失效则展示登录卡片 */ }
+    }
+  })();
+
+  // ====== Tabs ======
+  function showTab(id) {
+    document.getElementById('productsTab').style.display = (id === 'productsTab') ? 'block' : 'none';
+    document.getElementById('unitsTab').style.display = (id === 'unitsTab') ? 'block' : 'none';
+  }
+
+  // ====== 单位管理 ======
+  async function loadUnits() {
+    const data = await api('/api/units');
+    const tbody = document.querySelector('#unitsTable tbody');
+    const unitSelect = document.getElementById('pUnit');
+    tbody.innerHTML = '';
+    unitSelect.innerHTML = '';
+
+    data.forEach(u => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${u.id}</td>
+        <td>${u.name}</td>
+        <td><button class="danger" onclick="deleteUnit(${u.id})">删除</button></td>
+      `;
+      tbody.appendChild(tr);
+
+      const opt = document.createElement('option');
+      opt.value = u.name;
+      opt.textContent = u.name;
+      unitSelect.appendChild(opt);
+    });
+  }
+
+  async function addUnit() {
+    const name = document.getElementById('uName').value.trim();
+    if (!name) return alert('单位名不能为空');
+    await api('/api/units', { method: 'POST', body: JSON.stringify({ name }) });
+    document.getElementById('uName').value = '';
+    await loadUnits();
+  }
+
+  async function deleteUnit(id) {
+    if (!confirm('确定删除该单位？')) return;
+    await api('/api/units/' + id, { method: 'DELETE' });
+    await loadUnits();
+  }
+
+  // ====== 商品管理 ======
+  async function loadProducts() {
+    const data = await api('/api/products');
+    const tbody = document.querySelector('#productsTable tbody');
+    tbody.innerHTML = '';
+    data.forEach(p => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${p.id}</td>
+        <td>${p.sku || ''}</td>
+        <td>${p.name || ''}</td>
+        <td>${p.manufacturer || ''}</td>
+        <td>${p.price ?? ''}</td>
+        <td>${p.unit || ''}</td>
+        <td><button class="danger" onclick="deleteProduct(${p.id})">删除</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function addProduct() {
+    const sku = document.getElementById('pSku').value.trim();
+    const name = document.getElementById('pName').value.trim();
+    const manufacturer = document.getElementById('pManu').value.trim();
+    const price = parseFloat(document.getElementById('pPrice').value || '0');
+    const unit = document.getElementById('pUnit').value;
+
+    if (!name) return alert('请填写商品名');
+    await api('/api/products', {
+      method: 'POST',
+      body: JSON.stringify({ sku, name, manufacturer, price, unit })
+    });
+    document.getElementById('pSku').value = '';
+    document.getElementById('pName').value = '';
+    document.getElementById('pManu').value = '';
+    document.getElementById('pPrice').value = '';
+    await loadProducts();
+  }
+
+  async function deleteProduct(id) {
+    if (!confirm('确定删除该商品？')) return;
+    await api('/api/products/' + id, { method: 'DELETE' });
+    await loadProducts();
+  }
+</script>
+</body>
+</html>
