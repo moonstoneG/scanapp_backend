@@ -6,6 +6,9 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 import models, database
 from typing import Optional
+from fastapi import Depends, HTTPException, status
+from sqlalchemy.orm import Session
+import database, models
 
 SECRET_KEY = "your-secret-key"
 ALGORITHM = "HS256"
@@ -51,3 +54,11 @@ def authenticate_user(db: Session, username: str, password: str):
     if not verify_password(password, user.password_hash):
         return None
     return user
+
+def get_current_admin(current_user=Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admin users allowed"
+        )
+    return current_user

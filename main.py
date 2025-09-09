@@ -12,6 +12,15 @@ import models, schemas, auth
 from database import get_db, engine
 from fastapi.security import OAuth2PasswordRequestForm
 
+from fastapi import File, UploadFile
+from fastapi.responses import StreamingResponse, JSONResponse
+import io
+import pandas as pd
+from sqlalchemy.orm import Session
+from typing import Dict, Any
+import auth
+import models
+
 # ---------------- 数据库初始化 ----------------
 models.Base.metadata.create_all(bind=engine)
 # --- 放在 main.py 里 ---
@@ -224,6 +233,152 @@ def read_me(current_user=Depends(auth.get_current_user)):
     返回当前登录用户信息（依赖 Authorization: Bearer <token>）
     """
     return current_user  # schemas.UserOut 已 from_attributes=True，可直接返回 ORM 对象
+
+
+
+
+# ---- 工具：列名映射（容错大小写 / 中英文 / 空格）----
+_COLUMN_ALIASES = {
+    "sku": {"sku", "货号", "编号", "SKU", "Sku"},
+    "name": {"name", "商品名", "名称", "品名", "Name"},
+    "manufacturer": {"manufacturer", "厂家", "品牌", "厂商", "Manufacturer"},
+    "price": {"price", "价格", "单价", "Price"},
+    "unit": {"unit", "单位", "Unit"},
+}
+
+def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
+    col_map: Dict[str, str] = {}
+    for tgt, aliases in _COLUMN_ALIASES.items():
+        for c in df.columns:
+            plain = str(c).strip()
+            if plain in aliases:
+                col_map[plain] = tgt
+            elif plain.lower() in {a.lower() for a in aliases}:
+                col_map[plain] = tgt
+    # 把能识别的列统一改名为标准名
+    df = df.rename(columns=col_map)
+    # 只保留我们要的列
+    keep = [c for c in ["sku", "name", "manufacturer", "price", "unit"] if c in df.columns]
+    return df[keep]
+
+def _safe_float(v: Any) -> float:
+    if pd.isna(v) or v is None or v == "":
+        return 0.0
+    try:
+        return float(v)
+    except Exception:
+        return 0.0
+
+# ====== 导入模板下载 ======
+@app.get("/api/import/template")
+def download_template(_=Depends(auth.get_current_user)):  # 仅管理员
+    buf = io.StringIO()
+    buf.write("sku,name,manufacturer,price,unit\n")
+    # 留一行示例
+    buf.write("SKU001,示例商品,示例厂家,12.50,盒\n")
+    buf.seek(0)
+    return StreamingResponse(
+        io.BytesIO(buf.getvalue().encode("utf-8")),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="products_template.csv"'},
+    )
+
+# ====== 商品批量导入（xlsx/csv）======
+@app.post("/api/import/products")
+def import_products(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _=Depends(auth.get_current_user)  # 仅管理员
+):
+    # 校验文件类型
+    filename = file.filename or ""
+    name_lower = filename.lower()
+    try:
+        if name_lower.endswith(".xlsx"):
+            content = file.file.read()
+            df = pd.read_excel(io.BytesIO(content), engine="openpyxl")
+        elif name_lower.endswith(".csv"):
+            content = file.file.read()
+            df = pd.read_csv(io.BytesIO(content))
+        else:
+            return JSONResponse(status_code=400, content={"detail": "仅支持 .xlsx 或 .csv 文件"})
+
+        if df.empty:
+            return {"inserted": 0, "updated": 0, "skipped": 0, "message": "文件为空"}
+
+        df = _normalize_columns(df)
+        required = {"sku", "name"}
+        if not required.issubset(set(df.columns)):
+            return JSONResponse(
+                status_code=400,
+                content={"detail": f"缺少必要列：{required}，当前列：{list(df.columns)}"}
+            )
+
+        ins, upd, skip = 0, 0, 0
+
+        # 预取所有 unit 列表，缺的自动加入
+        from models import Unit, Product  # 根据你的项目结构
+        existing_units = {u.name for u in db.query(Unit).all()}
+
+        for _, row in df.iterrows():
+            sku = str(row.get("sku", "")).strip()
+            if not sku:
+                skip += 1
+                continue
+
+            name = str(row.get("name", "")).strip()
+            manufacturer = str(row.get("manufacturer", "")).strip() if "manufacturer" in row else None
+            price = _safe_float(row.get("price"))
+            unit_name = str(row.get("unit", "")).strip() if "unit" in row else None
+
+            # 单位不存在则创建
+            if unit_name and unit_name not in existing_units:
+                new_u = Unit(name=unit_name)
+                db.add(new_u)
+                db.flush()  # 先拿到 id
+                existing_units.add(unit_name)
+
+            # upsert by sku
+            p = db.query(Product).filter(Product.sku == sku).first()
+            if p:
+                # 更新
+                p.name = name or p.name
+                p.manufacturer = manufacturer if manufacturer else p.manufacturer
+                p.price = price if price is not None else p.price
+                p.unit = unit_name if unit_name else p.unit
+                upd += 1
+            else:
+                # 新增
+                new_p = Product(
+                    sku=sku,
+                    name=name,
+                    manufacturer=manufacturer or None,
+                    price=price,
+                    unit=unit_name or None,
+                )
+                db.add(new_p)
+                ins += 1
+
+        db.commit()
+        return {"inserted": ins, "updated": upd, "skipped": skip, "message": "导入完成"}
+
+    except Exception as e:
+        db.rollback()
+        return JSONResponse(status_code=500, content={"detail": f"导入失败：{e}"})
+    
+@app.get("/api/import/template")
+@app.get("/api/import/template/")
+def download_template(_=Depends(auth.get_current_user)):
+    # 生成一个标准模板 CSV（也可以换 xlsx）
+    buf = io.StringIO()
+    buf.write("sku,name,manufacturer,price,unit\n")
+    buf.write("TEST001,示例商品,示例厂家,12.34,盒\n")
+    buf.seek(0)
+    return StreamingResponse(
+        io.BytesIO(buf.getvalue().encode("utf-8")),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=product_template.csv"}
+    )
 # ---------------- Admin 页面 ----------------
 @app.get("/admin", response_class=HTMLResponse)
 def admin_page():

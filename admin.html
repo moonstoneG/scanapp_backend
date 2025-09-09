@@ -52,6 +52,17 @@
     <button onclick="showTab('unitsTab')">单位管理</button>
   </div>
 
+  <!-- 批量导入 -->
+<div class="card" id="importTab" style="margin-top: 16px;">
+  <h2>批量导入商品</h2>
+  <div class="row">
+    <button class="ghost" onclick="downloadTemplate()">下载模板</button>
+    <input type="file" id="importFile" accept=".xlsx,.csv" />
+    <button onclick="importProducts()">上传并导入</button>
+    <span class="muted" id="importStatus"></span>
+  </div>
+</div>
+
   <!-- 商品管理 -->
   <div id="productsTab" class="card" style="display:none;">
     <h2>商品列表</h2>
@@ -154,6 +165,48 @@ const API_BASE = location.hostname === "localhost" || location.hostname === "127
     localStorage.removeItem('token');
     location.reload();
   }
+
+  async function downloadTemplate() {
+  const res = await fetch(API_BASE + '/import/template', {
+    headers: setAuthHeader()
+  });
+  if (!res.ok) { alert('下载失败'); return; }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'products_template.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function importProducts() {
+  const f = document.getElementById('importFile').files[0];
+  if (!f) return alert('请选择文件（.xlsx 或 .csv）');
+
+  const fd = new FormData();
+  fd.append('file', f);
+
+  const res = await fetch(API_BASE + '/import/products', {
+    method: 'POST',
+    headers: setAuthHeader(), // 注意：FormData 不要再显式设置 Content-Type
+    body: fd
+  });
+
+  const txt = await res.text();
+  let data;
+  try { data = JSON.parse(txt); } catch { data = { detail: txt }; }
+
+  if (!res.ok) {
+    document.getElementById('importStatus').textContent = '导入失败：' + (data.detail || res.status);
+    alert('导入失败：' + (data.detail || res.status));
+    return;
+  }
+  document.getElementById('importStatus').textContent =
+    `导入完成：新增 ${data.inserted}，更新 ${data.updated}，跳过 ${data.skipped}`;
+  // 刷新商品列表
+  await loadProducts();
+}
 
   async function postLoginInit() {
     // 展示顶部用户信息、tab
