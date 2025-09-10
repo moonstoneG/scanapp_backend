@@ -28,8 +28,8 @@ from fastapi import FastAPI, Form, Depends
 from fastapi.responses import StreamingResponse
 from typing import List
 import io
-from . import auth
-from .doc_generate import Payload, Item, generate_doc_local
+import auth
+from doc_generate import Payload, Item, generate_doc_local
 
 # ---------------- 数据库初始化 ----------------
 models.Base.metadata.create_all(bind=engine)
