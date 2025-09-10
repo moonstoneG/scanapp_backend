@@ -1,3 +1,4 @@
+from ast import List
 from pydantic import BaseModel
 from typing import Optional
 
@@ -14,6 +15,20 @@ class UnitBase(BaseModel):
 class UnitCreate(UnitBase):
     pass
 
+class DocItem(BaseModel):
+    sku: str
+    name: str
+    manufacturer: Optional[str] = None
+    unit: Optional[str] = None
+    price: Optional[float] = 0
+    qty: Optional[int] = 1
+
+class DocPayload(BaseModel):
+    bureau: str
+    suspect: str
+    behavior: str
+    items: List[DocItem]
+    
 # ------- 商品 -------
 class ProductBase(BaseModel):
     sku: Optional[str] = None  

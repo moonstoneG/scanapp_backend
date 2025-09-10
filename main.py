@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import Body, FastAPI, Depends, Form, HTTPException, status
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -6,7 +6,10 @@ from typing import List
 import requests
 import json
 from urllib.parse import urlparse
-
+from fastapi import APIRouter, Depends
+from fastapi.responses import FileResponse
+from docx import Document
+import os, uuid
 from auth import get_password_hash
 import models, schemas, auth
 from database import get_db, engine
@@ -378,6 +381,68 @@ def download_template(_=Depends(auth.get_current_user)):
         io.BytesIO(buf.getvalue().encode("utf-8")),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": "attachment; filename=product_template.csv"}
+    )
+
+
+@app.post("/api/doc/generate")
+def generate_doc(
+    data: dict = Body(...),
+    _=Depends(auth.get_current_user)
+):
+    bureau = data.get("bureau")
+    suspect = data.get("suspect")
+    behavior = data.get("behavior")
+    items = data.get("items", [])
+
+    doc = Document("证据先行登记保存批准书.docx")
+
+    # 替换空行占位符
+    for p in doc.paragraphs:
+        if "_____" in p.text:
+            if "烟草局" in p.text:
+                p.text = p.text.replace("_____", bureau or "")
+            elif "涉嫌" in p.text:
+                if "行为" in p.text:
+                    p.text = p.text.replace("_____", behavior or "")
+                else:
+                    p.text = p.text.replace("_____", suspect or "")
+
+    # 填充表格
+    # 找到表格并填充
+    for t in doc.tables:
+    # 统计
+     total_kinds = len(items)
+     total_qty = 0
+
+    for i, item in enumerate(items):
+        # 假设 items[i] 是 {"name": "中华", "unit": "盒", "qty": 2}
+        name = item.get("name", "")
+        unit = item.get("unit", "")
+        qty = int(item.get("qty", 0))
+        total_qty += qty
+
+        # 表格一行有 6 列：name, unit, qty, name, unit, qty
+        row = t.rows[i + 1]  # 第 1 行是表头，从第 2 行开始写
+        row.cells[0].text = name
+        row.cells[1].text = unit
+        row.cells[2].text = str(qty)
+        row.cells[3].text = name
+        row.cells[4].text = unit
+        row.cells[5].text = str(qty)
+
+    # 第 7 行写统计
+    summary_row = t.rows[7 - 1]  # 第 7 行（下标 6）
+    summary_row.cells[0].text = f"种类数：{total_kinds}"
+    summary_row.cells[1].text = f"总数量：{total_qty}"
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": "attachment; filename=generated.docx"}
     )
 # ---------------- Admin 页面 ----------------
 @app.get("/admin", response_class=HTMLResponse)
