@@ -1,4 +1,3 @@
-from ast import List
 from pydantic import BaseModel
 from typing import Optional
 
@@ -27,7 +26,7 @@ class DocPayload(BaseModel):
     bureau: str
     suspect: str
     behavior: str
-    items: List[DocItem]
+    items: list[DocItem]
     
 # ------- 商品 -------
 class ProductBase(BaseModel):
