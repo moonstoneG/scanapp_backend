@@ -436,7 +436,7 @@ def download_template(_=Depends(auth.get_current_user)):
         headers={"Content-Disposition": "attachment; filename=product_template.csv"}
     )
 
-@app.get("/api//version")
+@app.get("/api/version")
 def get_version(_=Depends(auth.get_current_user)):
     """
     返回最新版本号和下载链接
