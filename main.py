@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from typing import Dict, Any
 import auth
 import models
-
+from fastapi.staticfiles import StaticFiles
 from fastapi import FastAPI, Form, Depends
 from fastapi.responses import StreamingResponse
 from typing import List
@@ -45,6 +45,7 @@ VERSION_FILE = os.path.join(os.path.dirname(__file__), "version.json")
 ACCESS_EXPIRE_MINUTES = getattr(auth, "ACCESS_TOKEN_EXPIRE_MINUTES", 60)
 # 确保有默认 admin 用户
 from auth import get_password_hash
+
 db = next(get_db())
 if not db.query(models.User).filter(models.User.username == "admin").first():
     db_user = models.User(
@@ -67,6 +68,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
 # ---------------- 登录 ----------------
 @app.post("/api/token")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
