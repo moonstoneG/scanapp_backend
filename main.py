@@ -41,6 +41,7 @@ from datetime import timedelta
 import auth, schemas  # 如果你在用相对导入，改成: from . import auth, schemas
 from database import get_db            # 相对导入版：from .database import get_db
 
+VERSION_FILE = os.path.join(os.path.dirname(__file__), "version.json")
 ACCESS_EXPIRE_MINUTES = getattr(auth, "ACCESS_TOKEN_EXPIRE_MINUTES", 60)
 # 确保有默认 admin 用户
 from auth import get_password_hash
@@ -435,6 +436,16 @@ def download_template(_=Depends(auth.get_current_user)):
         headers={"Content-Disposition": "attachment; filename=product_template.csv"}
     )
 
+@app.get("/api//version")
+def get_version(_=Depends(auth.get_current_user)):
+    """
+    返回最新版本号和下载链接
+    """
+    if not os.path.exists(VERSION_FILE):
+        raise HTTPException(status_code=404, detail="version.json not found")
+    with open(VERSION_FILE, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return JSONResponse(data)
 # ---------------- Admin 页面 ----------------
 @app.get("/admin", response_class=HTMLResponse)
 def admin_page():
