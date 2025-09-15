@@ -11,10 +11,10 @@ OUTPUT   = "generated_local.docx"
 
 # ======== 数据模型（示例）========
 class Item:
-    def __init__(self, name: str, unit: Optional[str], qty: int):
+    def __init__(self, name: str, unit: Optional[str], qty: float):
         self.name = name
         self.unit = unit or ""
-        self.qty  = int(qty or 0)
+        self.qty  = float(qty or 0)
 
 class Payload:
     def __init__(self, bureau: str, suspect: str, behavior: str, items: List[Item]):
@@ -61,7 +61,7 @@ def replace_core_placeholders(doc: Document, payload: Payload,
         simple_run_replace(p, "{{SUSPECT}}",  payload.suspect,  underline_suspect)
         simple_run_replace(p, "{{BEHAVIOR}}", payload.behavior, underline_behavior)
 
-def replace_total_placeholders(doc: Document, kinds: int, total_qty: int) -> bool:
+def replace_total_placeholders(doc: Document, kinds: float, total_qty: float) -> bool:
     """替换 {{TOTAL_KIND}} / {{TOTAL_QTY}}；返回是否至少替换了一个。"""
     replaced_any = False
     for p in iter_all_paragraphs(doc):
@@ -123,7 +123,7 @@ def fill_items_left_right(doc: Document, items: List[Item]):
             row_i += 1
         side = 1 - side
 
-def append_totals_numbers(doc: Document, kinds: int, total_qty: int):
+def append_totals_numbers(doc: Document, kinds: float, total_qty: float):
     """
     兜底：在包含“总计（品种）”“总计（数量）”的段落/单元格 **后面** 追加数字。
     """
