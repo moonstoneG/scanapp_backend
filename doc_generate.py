@@ -14,8 +14,19 @@ OUTPUT   = "generated_local.docx"
 class Item:
     def __init__(self, name: str, unit: Optional[str], qty: float):
         self.name = name
-        self.unit = unit or ""
-        self.qty  = float(qty or 0.0)
+        self.unit = "条"   # 统一为条
+        qty = float(qty or 0.0)
+
+        # 单位换算
+        unit = (unit or "").strip()
+        if unit == "盒":
+            qty = qty * 0.1
+        elif unit == "箱":
+            qty = qty * 50
+        # 其它情况默认当作「条」
+
+        # ✅ 保留一位小数
+        self.qty = round(qty, 1)
 
 class Payload:
     def __init__(self, bureau: str, suspect: str, behavior: str, items: List[Item]):
@@ -230,15 +241,15 @@ def get_fill_region_for_table(tbl):
         end_row = len(tbl.rows)
     return start_row, end_row
 
-def replace_page_placeholders(doc: Document, cur_page: int, total_pages: int):
+def replace_page_placeholder_in_table(tbl, cur_page: int, total_pages: int):
     """
-    替换 {{PAGE_INFO}} 占位符为 "第 n 页 共 m 页"
-    如果只有一页则不显示
+    只替换当前表格内的 {{PAGE_INFO}} 占位符
     """
     text_val = f"第 {cur_page} 页 共 {total_pages} 页" if total_pages > 1 else ""
-
-    for p in iter_all_paragraphs(doc):
-        simple_run_replace(p, "{{PAGE_INFO}}", text_val, underline=False)
+    for row in tbl.rows:
+        for cell in row.cells:
+            for p in cell.paragraphs:
+                simple_run_replace(p, "{{PAGE_INFO}}", text_val, underline=False)
 
 def generate_doc_local(payload: Payload,
                        underline_bureau=False, underline_suspect=True, underline_behavior=True,
@@ -266,12 +277,14 @@ def generate_doc_local(payload: Payload,
     batches = [payload.items[i:i+MAX_ITEMS] for i in range(0, len(payload.items), MAX_ITEMS)]
     total_pages = len(batches)
     for page_idx, (batch, tbl) in enumerate(zip(batches, six_col_tables)):
+        cur_page = page_idx + 1
         start_row, end_row = get_fill_region_for_table(tbl)
         nrows = max(end_row - start_row, 0)
         if nrows <= 0:
          continue
 
-        replace_page_placeholders(doc, page_idx+1, total_pages)
+        replace_page_placeholder_in_table(tbl, cur_page, total_pages)
+
 
         left_count = min(len(batch), nrows)
         right_count = min(max(len(batch) - left_count, 0), nrows)
