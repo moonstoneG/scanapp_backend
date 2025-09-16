@@ -262,32 +262,18 @@ class DocPayload(BaseModel):
     items: List[ItemModel]
     
 @app.post("/api/doc/generate1")
-def generate_doc1(
-    bureau: str = Form(...),
-    suspect: str = Form(...),
-    behavior: str = Form(...),
-    items: List[str] = Form(...),  # 前端传多次 "name|unit|qty"
-    _=Depends(auth.get_current_user)
-):
-    payload_items = []
-    for it in items:
-        try:
-            name, unit, qty = it.split("|")
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"非法的 item 格式: {it}")
+def generate_doc1(payload: DocPayload, _=Depends(auth.get_current_user)):
+    payload_items = [Item(it.name, it.unit, it.qty) for it in payload.items]
 
-        # ✅ 在 Item 里负责 float(qty) + 单位换算
-        payload_items.append(Item(name, unit, qty))
-
-    payload = Payload(
-        bureau=bureau,
-        suspect=suspect,
-        behavior=behavior,
+    doc_payload = Payload(
+        bureau=payload.bureau,
+        suspect=payload.suspect,
+        behavior=payload.behavior,
         items=payload_items
     )
 
     buf = io.BytesIO()
-    generate_doc_local(payload, output=buf)  # 生成 Word 文档到内存
+    generate_doc_local(doc_payload, output=buf)
     buf.seek(0)
 
     return StreamingResponse(
