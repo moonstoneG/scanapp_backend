@@ -1,5 +1,6 @@
 # test_fill_doc.py
 # pip install python-docx
+import cn2an
 from docx import Document
 from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -14,7 +15,7 @@ class Item:
     def __init__(self, name: str, unit: Optional[str], qty: float):
         self.name = name
         self.unit = unit or ""
-        self.qty  = float(qty or 0)
+        self.qty  = float(qty or 0.0)
 
 class Payload:
     def __init__(self, bureau: str, suspect: str, behavior: str, items: List[Item]):
@@ -61,7 +62,7 @@ def replace_core_placeholders(doc: Document, payload: Payload,
         simple_run_replace(p, "{{SUSPECT}}",  payload.suspect,  underline_suspect)
         simple_run_replace(p, "{{BEHAVIOR}}", payload.behavior, underline_behavior)
 
-def replace_total_placeholders(doc: Document, kinds: float, total_qty: float) -> bool:
+def replace_total_placeholders(doc: Document, kinds: int, total_qty: int) -> bool:
     """替换 {{TOTAL_KIND}} / {{TOTAL_QTY}}；返回是否至少替换了一个。"""
     replaced_any = False
     for p in iter_all_paragraphs(doc):
@@ -80,25 +81,65 @@ def find_six_col_table_and_region(doc: Document):
     if tbl is None:
         raise RuntimeError("模板中未找到 6 列的明细表")
 
-    start_row = 1
+    start_row = 1  # 默认第 0 行是表头
     end_row = len(tbl.rows)
+
     for i, row in enumerate(tbl.rows):
         line = " ".join(c.text for c in row.cells)
         if ("共计" in line) or ("总计" in line):
-            end_row = i
+            end_row = i   # 注意：总计行本身不算入可填充区
             break
+
     if end_row <= start_row:
         end_row = len(tbl.rows)
+
     return tbl, start_row, end_row
 
 def set_cell_center(cell):
     for p in cell.paragraphs:
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
+def fill_items_col_by_col(doc: Document, items: List[Item]):
+    """
+    先把左三列(名称/单位/数量)按行自上而下填满，再填右三列(名称/单位/数量)按行自上而下。
+    """
+    tbl, start, end = find_six_col_table_and_region(doc)
+    nrows = max(end - start, 0)
+    if nrows == 0 or not items:
+        return
+
+    # 左半区可容纳 nrows 条
+    left_count = min(len(items), nrows)
+    right_count = min(max(len(items) - left_count, 0), nrows)
+
+    # 先填左三列
+    for i in range(left_count):
+        row = tbl.rows[start + i]
+        it = items[i]
+        row.cells[0].text = it.name
+        row.cells[1].text = it.unit
+        num_str = str(it.qty).rstrip("0").rstrip(".");
+        row.cells[2].text = cn2an.an2cn(num_str, "up");
+        set_cell_center(row.cells[0]); set_cell_center(row.cells[1]); set_cell_center(row.cells[2])
+
+    # 再填右三列（从同一行起，自上而下）
+    for i in range(right_count):
+        row = tbl.rows[start + i]
+        it = items[left_count + i]
+        row.cells[3].text = it.name
+        row.cells[4].text = it.unit
+        num_str = str(it.qty).rstrip("0").rstrip(".");
+        row.cells[5].text = cn2an.an2cn(num_str, "up");
+        set_cell_center(row.cells[3]); set_cell_center(row.cells[4]); set_cell_center(row.cells[5])
+
 def fill_items_left_right(doc: Document, items: List[Item]):
     """
     将 items 顺序写入 6 列表：左三列(名/单位/数量) -> 右三列(名/单位/数量) -> 下一行
     """
+    def format_qty(qty):
+            f = float(qty)
+            return 
+        
     tbl, start, end = find_six_col_table_and_region(doc)
     max_slots = (end - start) * 2
     items = items[:max_slots]
@@ -113,7 +154,8 @@ def fill_items_left_right(doc: Document, items: List[Item]):
 
         row.cells[base + 0].text = it.name
         row.cells[base + 1].text = it.unit
-        row.cells[base + 2].text = str(it.qty)
+        num_str = str(it.qty).rstrip("0").rstrip(".");
+        row.cells[base + 2].text = cn2an.an2cn(num_str, "up");
 
         set_cell_center(row.cells[base + 0])
         set_cell_center(row.cells[base + 1])
@@ -123,7 +165,7 @@ def fill_items_left_right(doc: Document, items: List[Item]):
             row_i += 1
         side = 1 - side
 
-def append_totals_numbers(doc: Document, kinds: float, total_qty: float):
+def append_totals_numbers(doc: Document, kinds: int, total_qty: int):
     """
     兜底：在包含“总计（品种）”“总计（数量）”的段落/单元格 **后面** 追加数字。
     """
@@ -154,7 +196,7 @@ def append_totals_numbers(doc: Document, kinds: float, total_qty: float):
                     if not wrote_kind and "总计（品种）" in p.text:
                         wrote_kind = append_after_keyword_in_paragraph(p, "总计（品种）", kinds)
                     if not wrote_qty and "总计（数量）" in p.text:
-                        wrote_qty  = append_after_keyword_in_paragraph(p, "总计（数量）", total_qty)
+                        wrote_qty  = append_after_keyword_in_paragraph(p, "总计（数量）", int(total_qty))
                     if wrote_kind and wrote_qty:
                         break
             if wrote_kind and wrote_qty:
@@ -167,9 +209,36 @@ def append_totals_numbers(doc: Document, kinds: float, total_qty: float):
             if not wrote_kind and "总计（品种）" in p.text:
                 wrote_kind = append_after_keyword_in_paragraph(p, "总计（品种）", kinds)
             if not wrote_qty and "总计（数量）" in p.text:
-                wrote_qty  = append_after_keyword_in_paragraph(p, "总计（数量）", total_qty)
+                wrote_qty  = append_after_keyword_in_paragraph(p, "总计（数量）", int(total_qty))
             if wrote_kind and wrote_qty:
                 break
+
+def get_fill_region_for_table(tbl):
+    """
+    返回当前表格的可填充范围 [start_row, end_row)
+    - 默认第0行是表头，从第1行开始写
+    - 如果遇到“共计/总计”行，则该行不算入填充区域
+    """
+    start_row = 1
+    end_row = len(tbl.rows)
+    for i, row in enumerate(tbl.rows):
+        line = "".join(c.text or "" for c in row.cells)
+        if "共计" in line or "总计" in line:
+            end_row = i  # 保留该行为总计，不写入数据
+            break
+    if end_row <= start_row:
+        end_row = len(tbl.rows)
+    return start_row, end_row
+
+def replace_page_placeholders(doc: Document, cur_page: int, total_pages: int):
+    """
+    替换 {{PAGE_INFO}} 占位符为 "第 n 页 共 m 页"
+    如果只有一页则不显示
+    """
+    text_val = f"第 {cur_page} 页 共 {total_pages} 页" if total_pages > 1 else ""
+
+    for p in iter_all_paragraphs(doc):
+        simple_run_replace(p, "{{PAGE_INFO}}", text_val, underline=False)
 
 def generate_doc_local(payload: Payload,
                        underline_bureau=False, underline_suspect=True, underline_behavior=True,
@@ -179,7 +248,7 @@ def generate_doc_local(payload: Payload,
 
     doc = Document(template)
 
-    # 1) 核心占位符
+    # ===== 替换所有页的占位符 =====
     replace_core_placeholders(
         doc, payload,
         underline_bureau=underline_bureau,
@@ -187,13 +256,49 @@ def generate_doc_local(payload: Payload,
         underline_behavior=underline_behavior
     )
 
-    # 2) 表格填充（6 列）
-    fill_items_left_right(doc, payload.items)
+    # ===== 找所有 6 列表格 =====
+    six_col_tables = [t for t in doc.tables if len(t.columns) == 6]
+    if not six_col_tables:
+        raise RuntimeError("模板中未找到 6 列明细表")
 
-    # 3) 总计：先尝试占位符 {{TOTAL_KIND}} / {{TOTAL_QTY}}；若模板无这俩占位符则兜底追加
+    # ===== 按 20 条一批分配到各个表格 =====
+    MAX_ITEMS = 20
+    batches = [payload.items[i:i+MAX_ITEMS] for i in range(0, len(payload.items), MAX_ITEMS)]
+    total_pages = len(batches)
+    for page_idx, (batch, tbl) in enumerate(zip(batches, six_col_tables)):
+        start_row, end_row = get_fill_region_for_table(tbl)
+        nrows = max(end_row - start_row, 0)
+        if nrows <= 0:
+         continue
+
+        replace_page_placeholders(doc, page_idx+1, total_pages)
+
+        left_count = min(len(batch), nrows)
+        right_count = min(max(len(batch) - left_count, 0), nrows)
+
+        for i in range(left_count):
+            row = tbl.rows[start_row + i]
+            it = batch[i]
+            row.cells[0].text = it.name
+            row.cells[1].text = it.unit
+            num_str = str(it.qty).rstrip("0").rstrip(".")
+            row.cells[2].text = cn2an.an2cn(num_str, "up")
+            set_cell_center(row.cells[0]); set_cell_center(row.cells[1]); set_cell_center(row.cells[2])
+
+        for i in range(right_count):
+            row = tbl.rows[start_row + i]
+            it = batch[left_count + i]
+            row.cells[3].text = it.name
+            row.cells[4].text = it.unit
+            num_str = str(it.qty).rstrip("0").rstrip(".")
+            row.cells[5].text = cn2an.an2cn(num_str, "up")
+            set_cell_center(row.cells[3]); set_cell_center(row.cells[4]); set_cell_center(row.cells[5])
+        
+
+    # ===== 总计（仍然只在第一页替换一次） =====
     kinds = len(payload.items)
     total_qty = sum(it.qty for it in payload.items)
-    replaced = replace_total_placeholders(doc, kinds, total_qty)
+    replaced = replace_total_placeholders(doc, kinds, int(total_qty))
     if not replaced:
         append_totals_numbers(doc, kinds, total_qty)
 
