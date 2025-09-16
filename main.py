@@ -266,22 +266,35 @@ def generate_doc1(
     bureau: str = Form(...),
     suspect: str = Form(...),
     behavior: str = Form(...),
-    items: List[str] = Form(...),   # 前端传多次 items="中华|条|2"
+    items: List[str] = Form(...),  # "中华|盒|5" 这样的
     _=Depends(auth.get_current_user)
 ):
-    if not items:
-        raise HTTPException(status_code=400, detail="清单商品为空")
+    def convert_qty(unit: str, qty: float) -> float:
+        unit = (unit or "").strip()
+        if unit == "盒":
+            return round(qty * 0.1, 1)
+        elif unit == "箱":
+            return round(qty * 50, 1)
+        else:  # 默认按条
+            return round(qty, 1)
 
-    # ✅ 把前端的字符串列表解析成真正的 Item 对象
     payload_items = []
     for it in items:
-        try:
-            name, unit, qty = it.split("|")
-        except ValueError:
+        parts = it.split("|")
+        if len(parts) != 3:
             raise HTTPException(status_code=400, detail=f"非法的 item 格式: {it}")
-        payload_items.append(Item(name, unit, qty))  # 构建对象
 
-    # ✅ 构建 Payload（就像你本地测试时写的）
+        name, unit, qty = parts
+        try:
+            qty_val = float(qty)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"数量不是有效数字: {qty}")
+
+        # ✅ 在这里统一换算
+        qty_converted = convert_qty(unit, qty_val)
+
+        payload_items.append(Item(name, "条", qty_converted))  # 单位固定为条
+
     payload = Payload(
         bureau=bureau,
         suspect=suspect,
@@ -289,7 +302,6 @@ def generate_doc1(
         items=payload_items
     )
 
-    # ✅ 生成文书
     buf = io.BytesIO()
     generate_doc_local(payload, output=buf)
     buf.seek(0)
