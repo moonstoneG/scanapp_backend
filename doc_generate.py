@@ -19,9 +19,9 @@ class Item:
 
         # 单位换算
         unit = (unit or "").strip()
-        if unit == "盒":
+        if unit == " 盒":
             qty = qty * 0.1
-        elif unit == "箱":
+        elif unit == " 箱":
             qty = qty * 50
         # 其它情况默认当作「条」
 
