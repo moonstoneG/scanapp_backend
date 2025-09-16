@@ -261,44 +261,28 @@ class DocPayload(BaseModel):
     behavior: str
     items: List[ItemModel]
     
+
 @app.post("/api/doc/generate1")
-def generate_doc1(
-    bureau: str = Form(None),
-    suspect: str = Form(None),
-    behavior: str = Form(None),
-    json_payload: Union[DocPayload, None] = Body(None),  # 兼容 JSON
-    _=Depends(auth.get_current_user)
-):
-    payload_items = []
+def generate_doc1(payload: DocPayload, _=Depends(auth.get_current_user)):
+    # 转换成你内部的 Item/ Payload
+    payload_items = [Item(it.name, it.unit, it.qty) for it in payload.items]
 
-    if json_payload:  # ✅ 处理 JSON
-        bureau = json_payload.bureau
-        suspect = json_payload.suspect
-        behavior = json_payload.behavior
-        for it in json_payload.items:
-            payload_items.append(Item(it.name, it.unit, float(it.qty)))
-
-
-    else:
-        raise ValueError("必须提供 items（JSON 或 表单）")
-
-    payload = Payload(
-        bureau=bureau,
-        suspect=suspect,
-        behavior=behavior,
+    doc_payload = Payload(
+        bureau=payload.bureau,
+        suspect=payload.suspect,
+        behavior=payload.behavior,
         items=payload_items
     )
 
     buf = io.BytesIO()
-    generate_doc_local(payload, output=buf)   # 保存到内存
+    generate_doc_local(doc_payload, output=buf)
     buf.seek(0)
 
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": "attachment; filename=preserve.docx"}
+        headers={"Content-Disposition": 'attachment; filename="preserve.docx"'}
     )
-
 @app.post("/api/doc/generate2")
 def generate_doc2(
     bureau: str = Form(...),
