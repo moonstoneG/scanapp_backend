@@ -271,7 +271,7 @@ def generate_doc1(
 ):
     def convert_qty(unit: str, qty: float) -> float:
         unit = (unit or "").strip()
-        if unit == "盒":
+        if unit == "包":
             return round(qty * 0.1, 1)
         elif unit == "箱":
             return round(qty * 50, 1)
