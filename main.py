@@ -266,7 +266,6 @@ def generate_doc1(
     bureau: str = Form(None),
     suspect: str = Form(None),
     behavior: str = Form(None),
-    items: Union[List[str], None] = Form(None),   # 兼容表单字符串
     json_payload: Union[DocPayload, None] = Body(None),  # 兼容 JSON
     _=Depends(auth.get_current_user)
 ):
@@ -279,13 +278,6 @@ def generate_doc1(
         for it in json_payload.items:
             payload_items.append(Item(it.name, it.unit, float(it.qty)))
 
-    elif items:  # ✅ 处理表单字符串 "name|unit|qty"
-        for it in items:
-            parts = it.split("|")
-            if len(parts) != 3:
-                raise ValueError(f"非法的 item 格式: {it}")
-            name, unit, qty = parts
-            payload_items.append(Item(name, unit, float(qty)))
 
     else:
         raise ValueError("必须提供 items（JSON 或 表单）")
