@@ -256,12 +256,21 @@ def generate_doc1(
     items: List[str] = Form(...),
     _=Depends(auth.get_current_user)
 ):
+    
+ payload_items = []
+ for it in items:
+    parts = it.split("|")
+    if len(parts) != 3:
+        raise ValueError(f"非法的 item 格式: {it}")
+    name, unit, qty = parts
+    payload_items.append(Item(name, unit, float(qty)))
+
     payload = Payload(
-        bureau=bureau,
-        suspect=suspect,
-        behavior=behavior,
-        items=[Item(*it.split("|")) for it in items]
-    )
+     bureau=bureau,
+     suspect=suspect,
+     behavior=behavior,
+     items=payload_items
+)
     buf = io.BytesIO()
     generate_doc_local(payload, output=buf)   # 小改动：保存到内存而不是硬盘
     buf.seek(0)
