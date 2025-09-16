@@ -266,16 +266,18 @@ def generate_doc1(
     bureau: str = Form(...),
     suspect: str = Form(...),
     behavior: str = Form(...),
-    items: List[str] = Form(...),  # items=中华|条|2 多个
+    items: List[str] = Form(...),  # 前端传多次 "name|unit|qty"
     _=Depends(auth.get_current_user)
 ):
     payload_items = []
     for it in items:
-        parts = it.split("|")
-        if len(parts) != 3:
-            raise ValueError(f"非法的 item 格式: {it}")
-        name, unit, qty = parts
-        payload_items.append(Item(name, unit, float(qty)))
+        try:
+            name, unit, qty = it.split("|")
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"非法的 item 格式: {it}")
+
+        # ✅ 在 Item 里负责 float(qty) + 单位换算
+        payload_items.append(Item(name, unit, qty))
 
     payload = Payload(
         bureau=bureau,
@@ -283,9 +285,11 @@ def generate_doc1(
         behavior=behavior,
         items=payload_items
     )
+
     buf = io.BytesIO()
-    generate_doc_local(payload, output=buf)
+    generate_doc_local(payload, output=buf)  # 生成 Word 文档到内存
     buf.seek(0)
+
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
