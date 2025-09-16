@@ -19,9 +19,9 @@ class Item:
 
         # 单位换算
         unit = (unit or "").strip()
-        if unit == " 盒":
+        if unit == "盒":
             qty = qty * 0.1
-        elif unit == " 箱":
+        elif unit == "箱":
             qty = qty * 50
         # 其它情况默认当作「条」
 
@@ -285,7 +285,6 @@ def generate_doc_local(payload: Payload,
 
         replace_page_placeholder_in_table(tbl, cur_page, total_pages)
 
-
         left_count = min(len(batch), nrows)
         right_count = min(max(len(batch) - left_count, 0), nrows)
 
@@ -311,7 +310,7 @@ def generate_doc_local(payload: Payload,
     # ===== 总计（仍然只在第一页替换一次） =====
     kinds = len(payload.items)
     total_qty = sum(it.qty for it in payload.items)
-    replaced = replace_total_placeholders(doc, kinds, total_qty)
+    replaced = replace_total_placeholders(doc, kinds, int(total_qty))
     if not replaced:
         append_totals_numbers(doc, kinds, total_qty)
 
