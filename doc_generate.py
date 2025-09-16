@@ -311,7 +311,7 @@ def generate_doc_local(payload: Payload,
     # ===== 总计（仍然只在第一页替换一次） =====
     kinds = len(payload.items)
     total_qty = sum(it.qty for it in payload.items)
-    replaced = replace_total_placeholders(doc, kinds, int(total_qty))
+    replaced = replace_total_placeholders(doc, kinds, total_qty)
     if not replaced:
         append_totals_numbers(doc, kinds, total_qty)
 
