@@ -2,9 +2,10 @@ from fastapi import Body, FastAPI, Depends, Form, HTTPException, status
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Union
 import requests
 import json
+from pydantic import BaseModel
 from urllib.parse import urlparse
 from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
@@ -248,32 +249,58 @@ def read_me(current_user=Depends(auth.get_current_user)):
     return current_user  # schemas.UserOut 已 from_attributes=True，可直接返回 ORM 对象
 
 
+# --------- Pydantic 模型 ---------
+class ItemModel(BaseModel):
+    name: str
+    unit: str
+    qty: float
+
+class DocPayload(BaseModel):
+    bureau: str
+    suspect: str
+    behavior: str
+    items: List[ItemModel]
+    
 @app.post("/api/doc/generate1")
 def generate_doc1(
-    bureau: str = Form(...),
-    suspect: str = Form(...),
-    behavior: str = Form(...),
-    items: List[str] = Form(...),
+    bureau: str = Form(None),
+    suspect: str = Form(None),
+    behavior: str = Form(None),
+    items: Union[List[str], None] = Form(None),   # 兼容表单字符串
+    json_payload: Union[DocPayload, None] = Body(None),  # 兼容 JSON
     _=Depends(auth.get_current_user)
 ):
-    
- payload_items = []
- for it in items:
-    parts = it.split("|")
-    if len(parts) != 3:
-        raise ValueError(f"非法的 item 格式: {it}")
-    name, unit, qty = parts
-    payload_items.append(Item(name, unit, float(qty)))
+    payload_items = []
+
+    if json_payload:  # ✅ 处理 JSON
+        bureau = json_payload.bureau
+        suspect = json_payload.suspect
+        behavior = json_payload.behavior
+        for it in json_payload.items:
+            payload_items.append(Item(it.name, it.unit, float(it.qty)))
+
+    elif items:  # ✅ 处理表单字符串 "name|unit|qty"
+        for it in items:
+            parts = it.split("|")
+            if len(parts) != 3:
+                raise ValueError(f"非法的 item 格式: {it}")
+            name, unit, qty = parts
+            payload_items.append(Item(name, unit, float(qty)))
+
+    else:
+        raise ValueError("必须提供 items（JSON 或 表单）")
 
     payload = Payload(
-     bureau=bureau,
-     suspect=suspect,
-     behavior=behavior,
-     items=payload_items
-)
+        bureau=bureau,
+        suspect=suspect,
+        behavior=behavior,
+        items=payload_items
+    )
+
     buf = io.BytesIO()
-    generate_doc_local(payload, output=buf)   # 小改动：保存到内存而不是硬盘
+    generate_doc_local(payload, output=buf)   # 保存到内存
     buf.seek(0)
+
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
