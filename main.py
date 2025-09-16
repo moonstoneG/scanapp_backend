@@ -279,7 +279,7 @@ def generate_doc1(
             name, unit, qty = it.split("|")
         except ValueError:
             raise HTTPException(status_code=400, detail=f"非法的 item 格式: {it}")
-        payload_items.append(Item(name, unit, float(qty)))  # 构建对象
+        payload_items.append(Item(name, unit, qty))  # 构建对象
 
     # ✅ 构建 Payload（就像你本地测试时写的）
     payload = Payload(
