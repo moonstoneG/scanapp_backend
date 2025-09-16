@@ -261,23 +261,31 @@ class DocPayload(BaseModel):
     behavior: str
     items: List[ItemModel]
     
-
 @app.post("/api/doc/generate1")
-def generate_doc1(payload: DocPayload, _=Depends(auth.get_current_user)):
-    # 转换成你内部的 Item/ Payload
-    payload_items = [Item(it.name, it.unit, it.qty) for it in payload.items]
+def generate_doc1(
+    bureau: str = Form(...),
+    suspect: str = Form(...),
+    behavior: str = Form(...),
+    items: List[str] = Form(...),  # items=中华|条|2 多个
+    _=Depends(auth.get_current_user)
+):
+    payload_items = []
+    for it in items:
+        parts = it.split("|")
+        if len(parts) != 3:
+            raise ValueError(f"非法的 item 格式: {it}")
+        name, unit, qty = parts
+        payload_items.append(Item(name, unit, float(qty)))
 
-    doc_payload = Payload(
-        bureau=payload.bureau,
-        suspect=payload.suspect,
-        behavior=payload.behavior,
+    payload = Payload(
+        bureau=bureau,
+        suspect=suspect,
+        behavior=behavior,
         items=payload_items
     )
-
     buf = io.BytesIO()
-    generate_doc_local(doc_payload, output=buf)
+    generate_doc_local(payload, output=buf)
     buf.seek(0)
-
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
