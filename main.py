@@ -266,7 +266,7 @@ def generate_doc1(
     bureau: str = Form(...),
     suspect: str = Form(...),
     behavior: str = Form(...),
-    items: List[str] = Form(...),  # "中华|盒|5" 这样的
+    items: List[str] = Form(...),  # "中华|盒|5.0"
     _=Depends(auth.get_current_user)
 ):
     def convert_qty(unit: str, qty: float) -> float:
@@ -275,7 +275,7 @@ def generate_doc1(
             return round(qty * 0.1, 1)
         elif unit == "箱":
             return round(qty * 50, 1)
-        else:  # 默认按条
+        else:
             return round(qty, 1)
 
     payload_items = []
@@ -284,16 +284,15 @@ def generate_doc1(
         if len(parts) != 3:
             raise HTTPException(status_code=400, detail=f"非法的 item 格式: {it}")
 
-        name, unit, qty = parts
+        name, unit, qty_str = parts
         try:
-            qty_val = float(qty)
+            qty_val = float(qty_str)
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"数量不是有效数字: {qty}")
+            raise HTTPException(status_code=400, detail=f"数量不是有效数字: {qty_str}")
 
-        # ✅ 在这里统一换算
         qty_converted = convert_qty(unit, qty_val)
 
-        payload_items.append(Item(name, "条", qty_converted))  # 单位固定为条
+        payload_items.append(Item(name, "条", qty_converted))  # 单位统一为条
 
     payload = Payload(
         bureau=bureau,
