@@ -112,37 +112,6 @@ def set_cell_center(cell):
     for p in cell.paragraphs:
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-def add_diagonal(cell, direction="TL2BR"):
-    """
-    给单元格加斜线
-    :param cell: cell 对象
-    :param direction: "TL2BR" 左上到右下, "TR2BL" 右上到左下
-    """
-    tc_pr = cell._tc.get_or_add_tcPr()
-    shd = OxmlElement("w:shd")
-    shd.set(qn("w:val"), "clear")
-    shd.set(qn("w:color"), "auto")
-    shd.set(qn("w:fill"), "FFFFFF")
-    tc_pr.append(shd)
-
-    diag = OxmlElement("w:tcBorders")
-    if direction == "TL2BR":
-        br = OxmlElement("w:tl2br")
-        br.set(qn("w:val"), "single")
-        br.set(qn("w:sz"), "4")
-        br.set(qn("w:space"), "0")
-        br.set(qn("w:color"), "000000")
-        diag.append(br)
-    elif direction == "TR2BL":
-        bl = OxmlElement("w:tr2bl")
-        bl.set(qn("w:val"), "single")
-        bl.set(qn("w:sz"), "4")
-        bl.set(qn("w:space"), "0")
-        bl.set(qn("w:color"), "000000")
-        diag.append(bl)
-
-    tc_pr.append(diag)
-
 def fill_items_col_by_col(doc: Document, items: List[Item]):
     """
     先把左三列(名称/单位/数量)按行自上而下填满，再填右三列(名称/单位/数量)按行自上而下。
@@ -175,6 +144,39 @@ def fill_items_col_by_col(doc: Document, items: List[Item]):
         num_str = str(it.qty).rstrip("0").rstrip(".");
         row.cells[5].text = cn2an.an2cn(num_str, "up");
         set_cell_center(row.cells[3]); set_cell_center(row.cells[4]); set_cell_center(row.cells[5])
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+
+def add_diagonal(cell, direction="TL2BR"):
+    """
+    给单元格加斜线
+    :param cell: cell 对象
+    :param direction: "TL2BR" 左上到右下, "TR2BL" 右上到左下
+    """
+    tc_pr = cell._tc.get_or_add_tcPr()
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:val"), "clear")
+    shd.set(qn("w:color"), "auto")
+    shd.set(qn("w:fill"), "FFFFFF")
+    tc_pr.append(shd)
+
+    diag = OxmlElement("w:tcBorders")
+    if direction == "TL2BR":
+        br = OxmlElement("w:tl2br")
+        br.set(qn("w:val"), "single")
+        br.set(qn("w:sz"), "4")
+        br.set(qn("w:space"), "0")
+        br.set(qn("w:color"), "000000")
+        diag.append(br)
+    elif direction == "TR2BL":
+        bl = OxmlElement("w:tr2bl")
+        bl.set(qn("w:val"), "single")
+        bl.set(qn("w:sz"), "4")
+        bl.set(qn("w:space"), "0")
+        bl.set(qn("w:color"), "000000")
+        diag.append(bl)
+
+    tc_pr.append(diag)
 
 def fill_items_left_right(doc: Document, items: List[Item]):
     """
@@ -284,6 +286,14 @@ def replace_page_placeholder_in_table(tbl, cur_page: int, total_pages: int):
             for p in cell.paragraphs:
                 simple_run_replace(p, "{{PAGE_INFO}}", text_val, underline=False)
 
+def add_underline_to_cell(cell):
+    """
+    给单元格加一条水平下划线（用全角破折号代替）
+    """
+    cell.text = "——" * 5   # 根据单元格宽度调整重复次数
+    for p in cell.paragraphs:
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
 def generate_doc_local(payload: Payload,
                        underline_bureau=False, underline_suspect=True, underline_behavior=True,
                        template=TEMPLATE, output=OUTPUT):
@@ -343,7 +353,7 @@ def generate_doc_local(payload: Payload,
     # ===== 总计（仍然只在第一页替换一次） =====
     kinds = len(payload.items)
     total_qty = sum(it.qty for it in payload.items)
-    replaced = replace_total_placeholders(doc, kinds, float(total_qty))
+    replaced = replace_total_placeholders(doc, kinds, int(total_qty))
     if not replaced:
         append_totals_numbers(doc, kinds, total_qty)
 
