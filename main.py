@@ -273,7 +273,7 @@ def generate_doc1(
         unit = (unit or "").strip()
         if unit == "包":
             return round(qty * 0.1, 1)
-        elif unit == "箱":
+        elif unit == "件":
             return round(qty * 50, 1)
         else:
             return round(qty, 1)
