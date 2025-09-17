@@ -277,9 +277,12 @@ def generate_doc1(
             return round(qty * 50, 1)
         else:
             return round(qty, 1)
-
+    try:
+        items_data = json.loads(items)  # 转成 list[dict]
+    except Exception as e:
+        raise ValueError(f"无法解析 items JSON: {e}")
     payload_items = []
-    for it in items:
+    for it in items_data:
         parts = it.split("|")
         if len(parts) != 3:
             raise HTTPException(status_code=400, detail=f"非法的 item 格式: {it}")
