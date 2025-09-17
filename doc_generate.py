@@ -1,6 +1,5 @@
 # test_fill_doc.py
 # pip install python-docx
-import io
 import cn2an
 from docx import Document
 from docx.shared import Pt
@@ -348,8 +347,5 @@ def generate_doc_local(payload: Payload,
     if not replaced:
         append_totals_numbers(doc, kinds, total_qty)
 
-    buf = io.BytesIO()
-    doc.save(buf)
-    buf.seek(0)
-    return buf
-    
+    doc.save(output)
+    print(f"✅ 生成完成：{output}")

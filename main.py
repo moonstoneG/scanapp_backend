@@ -301,8 +301,9 @@ def generate_doc1(
         items=payload_items
     )
 
-    buf = generate_doc_local(payload, output=buf)
-    
+    buf = io.BytesIO()
+    generate_doc_local(payload, output=buf)
+    buf.seek(0)
 
     return StreamingResponse(
         buf,
