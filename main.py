@@ -284,6 +284,7 @@ def generate_doc1(
             return round(qty, 1)
 
     payload_items = []
+    print("👉 前端传来 items 数量:", len(items_data))
     for it in items_data:  # it 是 dict
         name = it.get("name", "")
         unit = it.get("unit", "")
