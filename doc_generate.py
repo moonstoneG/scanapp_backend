@@ -6,6 +6,8 @@ from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from typing import List, Optional
 import os
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 
 TEMPLATE = "证据先行登记保存批准书.docx"
 OUTPUT   = "generated_local.docx"
@@ -109,6 +111,37 @@ def find_six_col_table_and_region(doc: Document):
 def set_cell_center(cell):
     for p in cell.paragraphs:
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+def add_diagonal(cell, direction="TL2BR"):
+    """
+    给单元格加斜线
+    :param cell: cell 对象
+    :param direction: "TL2BR" 左上到右下, "TR2BL" 右上到左下
+    """
+    tc_pr = cell._tc.get_or_add_tcPr()
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:val"), "clear")
+    shd.set(qn("w:color"), "auto")
+    shd.set(qn("w:fill"), "FFFFFF")
+    tc_pr.append(shd)
+
+    diag = OxmlElement("w:tcBorders")
+    if direction == "TL2BR":
+        br = OxmlElement("w:tl2br")
+        br.set(qn("w:val"), "single")
+        br.set(qn("w:sz"), "4")
+        br.set(qn("w:space"), "0")
+        br.set(qn("w:color"), "000000")
+        diag.append(br)
+    elif direction == "TR2BL":
+        bl = OxmlElement("w:tr2bl")
+        bl.set(qn("w:val"), "single")
+        bl.set(qn("w:sz"), "4")
+        bl.set(qn("w:space"), "0")
+        bl.set(qn("w:color"), "000000")
+        diag.append(bl)
+
+    tc_pr.append(diag)
 
 def fill_items_col_by_col(doc: Document, items: List[Item]):
     """
@@ -310,7 +343,7 @@ def generate_doc_local(payload: Payload,
     # ===== 总计（仍然只在第一页替换一次） =====
     kinds = len(payload.items)
     total_qty = sum(it.qty for it in payload.items)
-    replaced = replace_total_placeholders(doc, kinds, int(total_qty))
+    replaced = replace_total_placeholders(doc, kinds, float(total_qty))
     if not replaced:
         append_totals_numbers(doc, kinds, total_qty)
 
