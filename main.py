@@ -266,38 +266,36 @@ def generate_doc1(
     bureau: str = Form(...),
     suspect: str = Form(...),
     behavior: str = Form(...),
-    items: str = Form(...),  # "中华|盒|5.0"
+    items: str = Form(...),  # 前端传 JSON 字符串
     _=Depends(auth.get_current_user)
 ):
     try:
-        items_data = json.loads(items)  # 解析成 list[dict]
+        items_data = json.loads(items)  # list[dict]
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"无法解析 items JSON: {e}")
     
     def convert_qty(unit: str, qty: float) -> float:
         unit = (unit or "").strip()
-        if unit == "包":
+        if unit in ["盒", "包"]:
             return round(qty * 0.1, 1)
-        elif unit == "件":
+        elif unit in ["箱", "件"]:
             return round(qty * 50, 1)
         else:
             return round(qty, 1)
 
     payload_items = []
-    for it in items_data:
-        parts = it.split("|")
-        if len(parts) != 3:
-            raise HTTPException(status_code=400, detail=f"非法的 item 格式: {it}")
+    for it in items_data:  # it 是 dict
+        name = it.get("name", "")
+        unit = it.get("unit", "")
+        qty = it.get("qty", 0)
 
-        name, unit, qty_str = parts
         try:
-            qty_val = float(qty_str)
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"数量不是有效数字: {qty_str}")
+            qty_val = float(qty)
+        except Exception:
+            raise HTTPException(status_code=400, detail=f"数量不是有效数字: {qty}")
 
         qty_converted = convert_qty(unit, qty_val)
-
-        payload_items.append(Item(name, "条", qty_converted))  # 单位统一为条
+        payload_items.append(Item(name, "条", qty_converted))  # ✅ 统一为条
 
     payload = Payload(
         bureau=bureau,
@@ -307,7 +305,7 @@ def generate_doc1(
     )
 
     buf = io.BytesIO()
-    generate_doc_local(payload, output=buf)
+    generate_doc_local(payload, output=buf)  # 写入内存
     buf.seek(0)
 
     return StreamingResponse(
