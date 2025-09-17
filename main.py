@@ -266,9 +266,14 @@ def generate_doc1(
     bureau: str = Form(...),
     suspect: str = Form(...),
     behavior: str = Form(...),
-    items: List[str] = Form(...),  # "中华|盒|5.0"
+    items: str = Form(...),  # "中华|盒|5.0"
     _=Depends(auth.get_current_user)
 ):
+    try:
+        items_data = json.loads(items)  # 解析成 list[dict]
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"无法解析 items JSON: {e}")
+    
     def convert_qty(unit: str, qty: float) -> float:
         unit = (unit or "").strip()
         if unit == "包":
@@ -277,10 +282,7 @@ def generate_doc1(
             return round(qty * 50, 1)
         else:
             return round(qty, 1)
-    try:
-        items_data = json.loads(items)  # 转成 list[dict]
-    except Exception as e:
-        raise ValueError(f"无法解析 items JSON: {e}")
+
     payload_items = []
     for it in items_data:
         parts = it.split("|")
