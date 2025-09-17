@@ -32,6 +32,9 @@ import io
 import auth
 from doc_generate import Payload, Item, generate_doc_local
 
+import logging
+logging.basicConfig(level=logging.INFO)
+
 # ---------------- 数据库初始化 ----------------
 models.Base.metadata.create_all(bind=engine)
 # --- 放在 main.py 里 ---
@@ -284,7 +287,7 @@ def generate_doc1(
             return round(qty, 1)
 
     payload_items = []
-    print("👉 前端传来 items 数量:", len(items_data))
+    logging.info(f"👉 前端传来 items 数量: {len(items_data)}")
     for it in items_data:  # it 是 dict
         name = it.get("name", "")
         unit = it.get("unit", "")
