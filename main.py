@@ -391,7 +391,7 @@ def generate_doc2(
     )
 
 @app.post("/api/doc/generate3")
-def generate_doc1(
+def generate_doc3(
     bureau: str = Form(...),
     suspect: str = Form(...),
     behavior: str = Form(...),
