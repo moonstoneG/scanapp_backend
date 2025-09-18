@@ -30,7 +30,8 @@ from fastapi.responses import StreamingResponse
 from typing import List
 import io
 import auth
-from doc_generate import Payload, Item, generate_doc_local
+from doc_generate import Payload, Item, generate_doc_local,iter_all_paragraphs, simple_run_replace,replace_core_placeholders
+import cn2an
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -322,23 +323,70 @@ def generate_doc2(
     bureau: str = Form(...),
     suspect: str = Form(...),
     behavior: str = Form(...),
-    items: List[str] = Form(...),
+    items: str = Form(...),  # 前端还是传 JSON 字符串
     _=Depends(auth.get_current_user)
 ):
+    try:
+        items_data = json.loads(items)  # list[dict]
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"无法解析 items JSON: {e}")
+
+    def convert_qty(unit: str, qty: float) -> float:
+        unit = (unit or "").strip()
+        if unit in ["盒", "包"]:
+            return round(qty * 0.1, 1)
+        elif unit in ["箱", "件"]:
+            return round(qty * 50, 1)
+        else:
+            return round(qty, 1)
+
+    payload_items = []
+    for it in items_data:
+        name = it.get("name", "")
+        unit = it.get("unit", "")
+        qty = it.get("qty", 0)
+        qty_val = float(qty)
+        qty_converted = convert_qty(unit, qty_val)
+        payload_items.append(Item(name, "条", qty_converted))
+
     payload = Payload(
         bureau=bureau,
         suspect=suspect,
         behavior=behavior,
-        items=[Item(*it.split("|")) for it in items]
+        items=payload_items,
     )
+
+    # === 新增的 Scene Transcript 替换逻辑 ===
+    def replace_scene_transcript(doc: Document, items: List[Item]):
+        parts = []
+        for it in items:
+            qty_cn = cn2an.an2cn(str(int(it.qty)), "up")
+            parts.append(f"{it.name}{qty_cn}{it.unit}")
+        transcript = "、".join(parts)
+
+        kinds = len(items)
+        total_qty = sum(it.qty for it in items)
+        kinds_cn = cn2an.an2cn(str(kinds), "up")
+        qty_cn   = cn2an.an2cn(str(int(total_qty)), "up")
+
+        for p in iter_all_paragraphs(doc):
+            simple_run_replace(p, "{{Scene Transcript}}", transcript)
+            simple_run_replace(p, "{{Kind}}", kinds_cn)
+            simple_run_replace(p, "{{Qty}}", qty_cn)
+
+    # === 生成文档 ===
+    doc = Document("现场笔录.docx")  # ⚠️ 新模板文件
+    replace_core_placeholders(doc, payload)
+    replace_scene_transcript(doc, payload.items)
+
     buf = io.BytesIO()
-    # 这里以后可以换成另一份 Word 模板
-    #generate_doc_local(payload, template="另一份文书模板.docx", output=buf)
+    doc.save(buf)
     buf.seek(0)
+
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": "attachment; filename=other.docx"}
+        headers={"Content-Disposition": 'attachment; filename="scene.docx"'}
     )
 
 # ---- 工具：列名映射（容错大小写 / 中英文 / 空格）----
