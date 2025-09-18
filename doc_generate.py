@@ -337,7 +337,7 @@ def generate_doc_local(payload: Payload,
             row.cells[0].text = it.name
             row.cells[1].text = it.unit
             num_str = str(it.qty).rstrip("0").rstrip(".")
-            row.cells[2].text = cn2an.an2cn(num_str, "up")
+            row.cells[2].text = num_str
             set_cell_center(row.cells[0]); set_cell_center(row.cells[1]); set_cell_center(row.cells[2])
 
         for i in range(right_count):
@@ -346,7 +346,7 @@ def generate_doc_local(payload: Payload,
             row.cells[3].text = it.name
             row.cells[4].text = it.unit
             num_str = str(it.qty).rstrip("0").rstrip(".")
-            row.cells[5].text = cn2an.an2cn(num_str, "up")
+            row.cells[5].text = num_str
             set_cell_center(row.cells[3]); set_cell_center(row.cells[4]); set_cell_center(row.cells[5])
         
 
