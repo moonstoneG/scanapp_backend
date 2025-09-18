@@ -367,7 +367,7 @@ def generate_doc2(
         kinds = len(items)
         total_qty = sum(it.qty for it in items)
         kinds_cn = cn2an.an2cn(str(kinds), "up")
-        qty_cn   = cn2an.an2cn(str(int(total_qty)), "up")
+        qty_cn   = cn2an.an2cn(str(float(total_qty)), "up")
 
         for p in iter_all_paragraphs(doc):
             simple_run_replace(p, "{{Scene Transcript}}", transcript)
