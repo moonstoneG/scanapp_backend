@@ -323,7 +323,12 @@ def generate_doc_local(payload: Payload,
     # ===== 找所有 6 列表格 =====
     six_col_tables = [t for t in doc.tables if len(t.columns) == 6]
     if not six_col_tables:
-        raise RuntimeError("模板中未找到 6 列明细表")
+     all_tables = [t for t in doc.tables if len(t.columns) == 3]
+     if len(all_tables) >= 2:
+        # 拼成一个逻辑上的 6 列
+        # 后续填充时需要自己写逻辑：左边用第一个表，右边用第二个表
+        six_col_tables = [all_tables[i:i+2] for i in range(0, len(all_tables), 2)]
+
 
     # ===== 按 20 条一批分配到各个表格 =====
     MAX_ITEMS = 20
