@@ -8,6 +8,7 @@ from typing import List, Optional
 import os
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
+from collections import defaultdict
 
 TEMPLATE = "证据先行登记保存批准书.docx"
 OUTPUT   = "generated_local.docx"
@@ -111,6 +112,15 @@ def find_six_col_table_and_region(doc: Document):
 def set_cell_center(cell):
     for p in cell.paragraphs:
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+def merge_items(items: list[Item]) -> list[Item]:
+    merged = {}
+    for it in items:
+        if it.name not in merged:
+            merged[it.name] = Item(it.name, it.unit, it.qty)
+        else:
+            merged[it.name].qty = round(merged[it.name].qty + it.qty, 1)
+    return list(merged.values())
 
 def fill_items_col_by_col(doc: Document, items: List[Item]):
     """

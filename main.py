@@ -30,7 +30,7 @@ from fastapi.responses import StreamingResponse
 from typing import List
 import io
 import auth
-from doc_generate import Payload, Item, generate_doc_local,iter_all_paragraphs, simple_run_replace,replace_core_placeholders
+from doc_generate import Payload, Item, generate_doc_local,iter_all_paragraphs, simple_run_replace,replace_core_placeholders,merge_items
 import cn2an
 
 import logging
@@ -301,7 +301,7 @@ def generate_doc1(
 
         qty_converted = convert_qty(unit, qty_val)
         payload_items.append(Item(name, "条", qty_converted))  # ✅ 统一为条
-
+    payload_items = merge_items(payload_items)
     payload = Payload(
         bureau=bureau,
         suspect=suspect,
