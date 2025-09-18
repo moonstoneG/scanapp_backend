@@ -306,7 +306,7 @@ def add_underline_to_cell(cell):
 
 def generate_doc_local(payload: Payload,
                        underline_bureau=False, underline_suspect=True, underline_behavior=True,
-                       template=TEMPLATE, output=OUTPUT):
+                       template:str = TEMPLATE, output=OUTPUT):
     if not os.path.exists(template):
         raise FileNotFoundError(f"模板不存在：{template}")
 
