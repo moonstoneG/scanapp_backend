@@ -360,7 +360,7 @@ def generate_doc2(
     def replace_scene_transcript(doc: Document, items: List[Item]):
         parts = []
         for it in items:
-            qty_cn = cn2an.an2cn(str(int(it.qty)), "up")
+            qty_cn = cn2an.an2cn(str(float(it.qty)), "up")
             parts.append(f"{it.name}{qty_cn}{it.unit}")
         transcript = "、".join(parts)
 
