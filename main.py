@@ -341,7 +341,7 @@ def generate_doc2(
             return round(qty, 1)
     
     payload_items = []
-    payload_items = merge_items(payload_items)
+    
     for it in items_data:
         name = it.get("name", "")
         unit = it.get("unit", "")
@@ -349,7 +349,7 @@ def generate_doc2(
         qty_val = float(qty)
         qty_converted = convert_qty(unit, qty_val)
         payload_items.append(Item(name, "条", qty_converted))
-
+    payload_items = merge_items(payload_items)
     payload = Payload(
         bureau=bureau,
         suspect=suspect,
