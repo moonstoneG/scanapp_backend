@@ -340,7 +340,7 @@ def generate_doc2(
         else:
             return round(qty, 1)
     
-    
+    payload_items = []
     payload_items = merge_items(payload_items)
     for it in items_data:
         name = it.get("name", "")
