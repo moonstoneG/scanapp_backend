@@ -426,7 +426,7 @@ def generate_doc3(
             raise HTTPException(status_code=400, detail=f"数量不是有效数字: {qty}")
 
         qty_converted = convert_qty(unit, qty_val)
-        payload_items.append(ItemPricing(name, "条", qty_converted))  # ✅ 统一为条
+        payload_items.append(Item(name, "条", qty_converted))  # ✅ 统一为条
     payload_items = merge_items(payload_items)
     payload = Payload(
         bureau=bureau,
@@ -473,7 +473,7 @@ def generate_doc4(
         price = it.get("price", 0)
         qty_val = float(qty)
         qty_converted = convert_qty(unit, qty_val)
-        payload_items.append(Item(name, "条", qty_converted, float(price)))
+        payload_items.append(ItemPricing(name, "条", qty_converted, float(price)))
 
     payload = Payload(
         bureau=bureau,
