@@ -445,11 +445,11 @@ def generate_doc3(
         headers={"Content-Disposition": 'attachment; filename="preserve.docx"'}
     )
 
-@router.post("/api/doc/generate4")
+@app.post("/api/doc/generate4")
 def generate_doc4(
     bureau: str = Form(...),
     items: str = Form(...),   # 前端还是传 JSON 字符串
-    _=Depends(get_current_user)
+    _=Depends(auth.get_current_user)
 ):
     try:
         items_data = json.loads(items)  # 解析成 list[dict]
