@@ -32,6 +32,7 @@ import io
 import auth
 from doc_generate import Payload, Item, generate_doc_local,iter_all_paragraphs, simple_run_replace,replace_core_placeholders,merge_items
 import cn2an
+from doc_generate2 import generate_doc_pricing
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -301,8 +302,8 @@ def generate_doc1(
 
         qty_converted = convert_qty(unit, qty_val)
         payload_items.append(Item(name, "条", qty_converted))  # ✅ 统一为条
-    payload_items = merge_items(payload_items)
-    payload = Payload(
+        payload_items = merge_items(payload_items)
+        payload = Payload(
         bureau=bureau,
         suspect=suspect,
         behavior=behavior,
@@ -442,6 +443,51 @@ def generate_doc3(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": 'attachment; filename="preserve.docx"'}
+    )
+
+@router.post("/api/doc/generate4")
+def generate_doc4(
+    bureau: str = Form(...),
+    items: str = Form(...),   # 前端还是传 JSON 字符串
+    _=Depends(get_current_user)
+):
+    try:
+        items_data = json.loads(items)  # 解析成 list[dict]
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"无法解析 items JSON: {e}")
+
+    def convert_qty(unit: str, qty: float) -> float:
+        unit = (unit or "").strip()
+        if unit in ["盒", "包"]:
+            return round(qty * 0.1, 1)
+        elif unit in ["箱", "件"]:
+            return round(qty * 50, 1)
+        else:
+            return round(qty, 1)
+
+    payload_items = []
+    for it in items_data:
+        name = it.get("name", "")
+        unit = it.get("unit", "")
+        qty = it.get("qty", 0)
+        price = it.get("price", 0)
+        qty_val = float(qty)
+        qty_converted = convert_qty(unit, qty_val)
+        payload_items.append(Item(name, "条", qty_converted, float(price)))
+
+    payload = Payload(
+        bureau=bureau,
+        items=payload_items
+    )
+
+    buf = io.BytesIO()
+    generate_doc_pricing(payload, template="涉案物品核价表.docx", output=buf)  # 写入内存
+    buf.seek(0)
+
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": 'attachment; filename="pricing.docx"'}
     )
 # ---- 工具：列名映射（容错大小写 / 中英文 / 空格）----
 _COLUMN_ALIASES = {
