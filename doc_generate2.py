@@ -96,7 +96,7 @@ def replace_page_placeholders_in_doc(doc: Document, total_pages: int):
 
     for idx, p in enumerate(placeholders):
         cur_page = idx + 1
-        text_val = f"第 {cur_page} 页 共 {total_pages} 页" if total_pages > 1 else ""
+        text_val = f"第 {cur_page} 页 共 {total_pages} 页"
         # 清空 runs
         for r in p.runs:
             r.text = ""
