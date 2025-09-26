@@ -32,7 +32,7 @@ import io
 import auth
 from doc_generate import Payload, Item, generate_doc_local,iter_all_paragraphs, simple_run_replace,replace_core_placeholders,merge_items
 import cn2an
-from doc_generate2 import generate_doc_pricing
+from doc_generate2 import Payload as PayloadPricing, Item as ItemPricing, generate_doc_pricing
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -426,7 +426,7 @@ def generate_doc3(
             raise HTTPException(status_code=400, detail=f"数量不是有效数字: {qty}")
 
         qty_converted = convert_qty(unit, qty_val)
-        payload_items.append(Item(name, "条", qty_converted))  # ✅ 统一为条
+        payload_items.append(ItemPricing(name, "条", qty_converted))  # ✅ 统一为条
     payload_items = merge_items(payload_items)
     payload = Payload(
         bureau=bureau,
