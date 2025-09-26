@@ -477,6 +477,8 @@ def generate_doc4(
 
     payload = Payload(
         bureau=bureau,
+        suspect=" ",
+        behavior=" ",
         items=payload_items
     )
 
