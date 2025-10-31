@@ -36,7 +36,7 @@ from doc_generate2 import Payload as PayloadPricing, Item as ItemPricing, genera
 from users import router as users_router
 import logging
 from passlib.context import CryptContext
-
+import sys
 logging.basicConfig(level=logging.INFO)
 
 # ---------------- 数据库初始化 ----------------
@@ -107,11 +107,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger(__name__)
+
 app.include_router(users_router, prefix="/scanapp/api/users")
 
 for r in app.routes:
-    print(r.path, r.name)
-    
+    logger.log(r.path, r.name)
+
 app.mount("/scanapp/static", StaticFiles(directory="static"), name="static")
 # ---------------- 登录 ----------------
 @app.post("/api/token")
