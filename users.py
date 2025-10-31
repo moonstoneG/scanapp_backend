@@ -26,14 +26,14 @@ class UserOut(BaseModel):
         orm_mode = True
 
 
-@router.get(response_model=List[UserOut])
+@router.get("/", response_model=List[UserOut])
 def list_users(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="非管理员无权查看")
     return db.query(models.User).all()
 
 
-@router.post(response_model=UserOut)
+@router.post("/", response_model=UserOut)
 def create_user(user: UserCreate, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="非管理员无权添加")
