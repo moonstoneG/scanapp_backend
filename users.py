@@ -7,7 +7,7 @@ from database import get_db
 from auth import get_current_user, get_password_hash  # 假设已有
 import models
 
-router = APIRouter(tags=["用户管理"])
+router = APIRouter()
 
 class UserCreate(BaseModel):
     username: str
