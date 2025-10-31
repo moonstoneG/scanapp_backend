@@ -50,6 +50,7 @@
   <div class="tabs" id="tabs" style="display:none;">
     <button onclick="showTab('productsTab')">商品管理</button>
     <button onclick="showTab('unitsTab')">单位管理</button>
+    <button id="userTabBtn" style="display:none;" onclick="showTab('usersTab')">账号管理</button>
   </div>
 
   <!-- 批量导入 -->
@@ -115,6 +116,29 @@
     <div class="muted">删除单位前请确认没有商品正在引用该单位。</div>
   </div>
 
+  <!-- 账号管理 -->
+<div id="usersTab" class="card" style="display:none;">
+  <h2>账号管理</h2>
+  <table id="usersTable">
+    <thead>
+      <tr><th>ID</th><th>用户名</th><th>姓名</th><th>部门</th><th>角色</th><th>操作</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <h3 style="margin-top:16px;">添加账号</h3>
+<div class="row">
+  <input id="uUser" placeholder="用户名" />
+  <input id="uPass" placeholder="密码" type="password" />
+  <input id="uFullName" placeholder="姓名" />
+  <input id="uDept" placeholder="部门" />
+  <select id="uRole">
+    <option value="false">普通用户</option>
+    <option value="true">管理员</option>
+  </select>
+  <button onclick="addUser()">添加</button>
+</div>
+</div>
 <script>
 
 // ====== 基础工具 ======
@@ -224,7 +248,11 @@ async function importProducts() {
     await loadUnits(); // 先加载单位，填充商品下拉
     showTab('productsTab');
     await loadProducts();
-  }
+    if (me.is_admin) {
+    document.getElementById('userTabBtn').style.display = 'inline-block';
+    await loadUsers();
+    }
+}
 
   // 初始：如果已有 token，直接尝试初始化
   (async () => {
@@ -236,9 +264,57 @@ async function importProducts() {
 
   // ====== Tabs ======
   function showTab(id) {
-    document.getElementById('productsTab').style.display = (id === 'productsTab') ? 'block' : 'none';
-    document.getElementById('unitsTab').style.display = (id === 'unitsTab') ? 'block' : 'none';
-  }
+  const tabs = ['productsTab', 'unitsTab', 'usersTab'];
+  tabs.forEach(t => {
+    document.getElementById(t).style.display = (t === id) ? 'block' : 'none';
+  });
+}
+
+  // ========== 用户管理 ==========
+  async function loadUsers() {
+  const data = await api('/users');
+  const tbody = document.querySelector('#usersTable tbody');
+  tbody.innerHTML = '';
+  data.forEach(u => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${u.id}</td>
+      <td>${u.username}</td>
+      <td>${u.full_name || ''}</td>
+      <td>${u.department || ''}</td>
+      <td>${u.is_admin ? '管理员' : '普通用户'}</td>
+      <td><button class="danger" onclick="deleteUser(${u.id})">删除</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+async function addUser() {
+  const username = document.getElementById('uUser').value.trim();
+  const password = document.getElementById('uPass').value.trim();
+  const full_name = document.getElementById('uFullName').value.trim();
+  const department = document.getElementById('uDept').value.trim();
+  const is_admin = document.getElementById('uRole').value === 'true';
+
+  if (!username || !password) return alert('用户名和密码不能为空');
+
+  await api('/users', {
+    method: 'POST',
+    body: JSON.stringify({ username, password, full_name, department, is_admin })
+  });
+
+  document.getElementById('uUser').value = '';
+  document.getElementById('uPass').value = '';
+  document.getElementById('uFullName').value = '';
+  document.getElementById('uDept').value = '';
+
+  await loadUsers();
+}
+
+async function deleteUser(id) {
+  if (!confirm('确定删除该账号？')) return;
+  await api('/users/' + id, { method: 'DELETE' });
+  await loadUsers();
+}
 
   // ====== 单位管理 ======
   async function loadUnits() {

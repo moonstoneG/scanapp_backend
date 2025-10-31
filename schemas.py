@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import List, Optional
 
 # ------- 单位 -------
 class UnitOut(BaseModel):
@@ -14,6 +14,8 @@ class UnitBase(BaseModel):
 class UnitCreate(UnitBase):
     pass
 
+
+    
 class DocItem(BaseModel):
     sku: str
     name: str
@@ -52,10 +54,15 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
-
+    full_name: Optional[str] = None
+    department: Optional[str] = None
+# ------- 用户 -------
 class UserOut(BaseModel):
     id: int
     username: str
+    full_name: Optional[str] = None
+    department: Optional[str] = None
     is_admin: bool = False
+
     class Config:
-        from_attributes = True  # Pydantic v2
+        orm_mode = True  # Pydantic v1

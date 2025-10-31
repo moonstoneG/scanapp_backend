@@ -9,7 +9,8 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     is_admin = Column(Boolean, default=False)
-
+    full_name = Column(String, nullable=True)   # 新增姓名字段
+    department = Column(String, nullable=True)  # 新增部门字段
 class Unit(Base):
     __tablename__ = "units"
 

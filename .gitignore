@@ -1,2 +1,8 @@
 scanapp.db
 .venv
+*.db
+scanapp.db
+*.docx
+static/app-release.apk
+version.json
+version.json

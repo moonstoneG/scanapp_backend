@@ -15,7 +15,7 @@ from auth import get_password_hash
 import models, schemas, auth
 from database import get_db, engine
 from fastapi.security import OAuth2PasswordRequestForm
-
+from models import User
 from fastapi import File, UploadFile
 from fastapi.responses import StreamingResponse, JSONResponse
 import io
@@ -33,8 +33,10 @@ import auth
 from doc_generate import Payload, Item, generate_doc_local,iter_all_paragraphs, simple_run_replace,replace_core_placeholders,merge_items
 import cn2an
 from doc_generate2 import Payload as PayloadPricing, Item as ItemPricing, generate_doc_pricing
-
+from users import router as users_router
 import logging
+from passlib.context import CryptContext
+
 logging.basicConfig(level=logging.INFO)
 
 # ---------------- 数据库初始化 ----------------
@@ -52,6 +54,16 @@ ACCESS_EXPIRE_MINUTES = getattr(auth, "ACCESS_TOKEN_EXPIRE_MINUTES", 60)
 # 确保有默认 admin 用户
 from auth import get_password_hash
 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# 密码哈希
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+# 密码验证
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
 db = next(get_db())
 if not db.query(models.User).filter(models.User.username == "admin").first():
     db_user = models.User(
@@ -63,6 +75,27 @@ if not db.query(models.User).filter(models.User.username == "admin").first():
     db.commit()
 db.close()
 
+# --------- Pydantic 模型 ---------
+class ItemModel(BaseModel):
+    name: str
+    unit: str
+    qty: float
+
+class DocPayload(BaseModel):
+    bureau: str
+    suspect: str
+    behavior: str
+    items: List[ItemModel]
+
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    is_admin: bool = False
+    full_name: str = None    # 新增字段：人名
+    department: str = None   # 新增字段：部门
+    
+    
 # ---------------- FastAPI 初始化 ----------------
 app = FastAPI()
 
@@ -73,6 +106,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(users_router)
 
 app.mount("/scanapp/static", StaticFiles(directory="static"), name="static")
 # ---------------- 登录 ----------------
@@ -115,6 +150,7 @@ def delete_unit(unit_id: int, db: Session = Depends(get_db), _=Depends(auth.get_
     db.delete(db_unit)
     db.commit()
     return {"ok": True}
+
 
 # ---------------- 商品管理 ----------------
 @app.get("/api/products", response_model=List[schemas.ProductOut])
@@ -254,18 +290,6 @@ def read_me(current_user=Depends(auth.get_current_user)):
     return current_user  # schemas.UserOut 已 from_attributes=True，可直接返回 ORM 对象
 
 
-# --------- Pydantic 模型 ---------
-class ItemModel(BaseModel):
-    name: str
-    unit: str
-    qty: float
-
-class DocPayload(BaseModel):
-    bureau: str
-    suspect: str
-    behavior: str
-    items: List[ItemModel]
-    
 @app.post("/api/doc/generate1")
 def generate_doc1(
     bureau: str = Form(...),
