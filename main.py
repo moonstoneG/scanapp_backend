@@ -116,9 +116,9 @@ logger = logging.getLogger(__name__)
 
 app.include_router(users_router, prefix="/scanapp/api/users")
 
-for r in app.routes:
-    logger.log(r.path, r.name)
-
+for r in app.router.routes:
+    logger.info(f"Route: path={r.path}, name={r.name}")
+    
 app.mount("/scanapp/static", StaticFiles(directory="static"), name="static")
 # ---------------- 登录 ----------------
 @app.post("/api/token")
