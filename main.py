@@ -107,7 +107,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(users_router, prefix="/api/users")
+app.include_router(users_router)
 
 app.mount("/scanapp/static", StaticFiles(directory="static"), name="static")
 # ---------------- 登录 ----------------
