@@ -109,6 +109,9 @@ app.add_middleware(
 
 app.include_router(users_router, prefix="/scanapp/api/users")
 
+for r in app.routes:
+    print(r.path, r.name)
+    
 app.mount("/scanapp/static", StaticFiles(directory="static"), name="static")
 # ---------------- 登录 ----------------
 @app.post("/api/token")
