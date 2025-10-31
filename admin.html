@@ -272,7 +272,7 @@ async function importProducts() {
 
   // ========== 用户管理 ==========
   async function loadUsers() {
-  const data = await api('/users');
+  const data = await api(API_BASE +'/users');
   const tbody = document.querySelector('#usersTable tbody');
   tbody.innerHTML = '';
   data.forEach(u => {
@@ -297,7 +297,7 @@ async function addUser() {
 
   if (!username || !password) return alert('用户名和密码不能为空');
 
-  await api('/users', {
+  await api(API_BASE + '/users', {
     method: 'POST',
     body: JSON.stringify({ username, password, full_name, department, is_admin })
   });
@@ -312,7 +312,7 @@ async function addUser() {
 
 async function deleteUser(id) {
   if (!confirm('确定删除该账号？')) return;
-  await api('/users/' + id, { method: 'DELETE' });
+  await api(API_BASE +'/users/' + id, { method: 'DELETE' });
   await loadUsers();
 }
 
