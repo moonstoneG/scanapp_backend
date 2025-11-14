@@ -509,7 +509,7 @@ def generate_doc4(
         qty_converted = convert_qty(unit, qty_val)
         payload_items.append(ItemPricing(name, "条", qty_converted, float(price)))
     payload_items = merge_items(payload_items)
-    payload = Payload(
+    payload = PayloadPricing(
         bureau=bureau,
         suspect=" ",
         behavior=" ",
