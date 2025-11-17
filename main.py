@@ -13,7 +13,7 @@ from docx import Document
 import os, uuid
 from auth import get_password_hash
 import models, schemas, auth
-from database import get_db, engine
+from database import get_db, engine,Base
 from fastapi.security import OAuth2PasswordRequestForm
 from models import User
 from fastapi import File, UploadFile
@@ -37,6 +37,9 @@ from users import router as users_router
 import logging
 from passlib.context import CryptContext
 import sys
+from sqlalchemy import Column, String, Integer, Float, DateTime, ForeignKey, func
+from sqlalchemy.orm import relationship
+import uuid
 logging.basicConfig(level=logging.INFO)
 
 # ---------------- 数据库初始化 ----------------
@@ -682,3 +685,37 @@ def get_version(_=Depends(auth.get_current_user)):
 @app.get("/admin", response_class=HTMLResponse)
 def admin_page():
     return HTMLResponse(content=open("admin.html", "r", encoding="utf-8").read())
+
+
+def gen_uuid():
+    return str(uuid.uuid4())
+
+
+class ScanList(Base):
+    __tablename__ = "scan_lists"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    title = Column(String, nullable=False)
+    created_by = Column(String, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    items = relationship(
+        "ScanItem",
+        back_populates="list",
+        cascade="all, delete-orphan"
+    )
+
+
+class ScanItem(Base):
+    __tablename__ = "scan_items"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    list_id = Column(String, ForeignKey("scan_lists.id"))
+    sku = Column(String, nullable=False)
+    name = Column(String, nullable=False)
+    qty = Column(Float, default=0)
+    price = Column(Float, default=0)
+    unit = Column(String, default="条")
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    list = relationship("ScanList", back_populates="items")
