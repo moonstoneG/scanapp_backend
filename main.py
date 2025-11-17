@@ -41,13 +41,16 @@ from sqlalchemy import Column, String, Integer, Float, DateTime, ForeignKey, fun
 from sqlalchemy.orm import relationship
 import uuid
 logging.basicConfig(level=logging.INFO)
-
+from sqlalchemy import Column, Integer, String, Text, DateTime
+from datetime import datetime
+import json
 # ---------------- 数据库初始化 ----------------
 models.Base.metadata.create_all(bind=engine)
 # --- 放在 main.py 里 ---
 from fastapi import Request, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import timedelta
+import random, string
 
 import auth, schemas  # 如果你在用相对导入，改成: from . import auth, schemas
 from database import get_db            # 相对导入版：from .database import get_db
@@ -77,6 +80,20 @@ if not db.query(models.User).filter(models.User.username == "admin").first():
     db.add(db_user)
     db.commit()
 db.close()
+
+class CollabRoom(Base):
+    __tablename__ = "collab_rooms"
+
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(16), unique=True, index=True)  # 协作码，比如 6 位短码
+    data_json = Column(Text, nullable=False)            # 存整个清单 JSON
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def get_list(self) -> dict:
+        return json.loads(self.data_json)
+
+    def set_list(self, data: dict):
+        self.data_json = json.dumps(data, ensure_ascii=False)
 
 # --------- Pydantic 模型 ---------
 class ItemModel(BaseModel):
@@ -132,7 +149,98 @@ app.include_router(users_router, prefix="/api/users")
 for r in app.router.routes:
     logger.info(f"Route: path={r.path}, name={r.name}")
 
+
+def merge_lists(base: dict, incoming: dict) -> dict:
+    """
+    base / incoming 都是 CollabList 的 dict 结构：
+    {id, name, items:[{sku,name,unit,price,qty}, ...]}
+    """
+    merged = {
+        "id": base.get("id") or incoming.get("id"),
+        "name": base.get("name") or incoming.get("name"),
+        "items": []
+    }
+
+    items_map = {}
+
+    def add_items(items):
+        for it in items:
+            key = it.get("sku") or it.get("name")
+            if not key:
+                continue
+            if key not in items_map:
+                items_map[key] = {
+                    "sku": it.get("sku"),
+                    "name": it.get("name"),
+                    "unit": it.get("unit"),
+                    "price": float(it.get("price") or 0),
+                    "qty": float(it.get("qty") or 0),
+                }
+            else:
+                items_map[key]["qty"] += float(it.get("qty") or 0)
+                # 价格简单取最近一次，也可以做加权平均
+
+    add_items(base.get("items") or [])
+    add_items(incoming.get("items") or [])
+
+    merged["items"] = list(items_map.values())
+    return merged
+
+def gen_code(length=6):
+    return "".join(random.choices(string.ascii_uppercase + string.digits, k=length))
+
 app.mount("/scanapp/static", StaticFiles(directory="static"), name="static")
+
+
+# ① 创建协作清单：上传本地清单 → 返回协作码
+@app.post("/api/collab/create")
+def collab_create(
+    body: schemas.CollabList,
+    db: Session = Depends(get_db),
+    _=Depends(auth.get_current_user)
+):
+    code = gen_code()
+    while db.query(CollabRoom).filter_by(code=code).first():
+        code = gen_code()
+
+    room = CollabRoom(code=code, data_json=body.model_dump_json(ensure_ascii=False))
+    db.add(room)
+    db.commit()
+    return {"code": code}
+
+
+# ② 加入协作：上传当前本地清单 → 服务端合并 → 返回合并后的完整清单
+@app.post("/api/collab/join/{code}", response_model=schemas.CollabList)
+def collab_join(
+    code: str,
+    body: schemas.CollabList,
+    db: Session = Depends(get_db),
+    _=Depends(auth.get_current_user)
+):
+    room = db.query(CollabRoom).filter_by(code=code).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="协作码不存在")
+
+    base = room.get_list()
+    merged = merge_lists(base, body.model_dump())
+
+    room.set_list(merged)
+    db.commit()
+
+    return merged
+
+
+# ③ 获取协作清单（用于刷新）
+@app.get("/api/collab/{code}", response_model=schemas.CollabList)
+def collab_get(
+    code: str,
+    db: Session = Depends(get_db),
+    _=Depends(auth.get_current_user)
+):
+    room = db.query(CollabRoom).filter_by(code=code).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="协作码不存在")
+    return room.get_list()
 # ---------------- 登录 ----------------
 @app.post("/api/token")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
@@ -822,3 +930,17 @@ def delete_item(
 
     lst = db.query(models.ScanList).filter(models.ScanList.id == list_id).first()
     return lst
+
+class CollabRoom(Base):
+    __tablename__ = "collab_rooms"
+
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(16), unique=True, index=True)  # 协作码：ABCDE1
+    data_json = Column(Text, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def get_list(self) -> dict:
+        return json.loads(self.data_json)
+
+    def set_list(self, data: dict):
+        self.data_json = json.dumps(data, ensure_ascii=False)

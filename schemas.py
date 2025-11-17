@@ -57,6 +57,18 @@ class UpdateItem(BaseModel):
     qty: float
 
 
+class CollabItem(BaseModel):
+    sku: Optional[str] = None
+    name: str
+    unit: Optional[str] = None
+    price: float = 0.0
+    qty: float = 0.0
+
+class CollabList(BaseModel):
+    id: str
+    name: str  # 如果你现在前端是 title，就改成 title
+    items: List[CollabItem]
+    
 class ScanListOut(BaseModel):
     """
     一个完整的清单（包含所有条目）
