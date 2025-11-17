@@ -1,4 +1,6 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey
+from datetime import datetime
+import json
+from sqlalchemy import Column, DateTime, Integer, String, Float, Boolean, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -27,4 +29,17 @@ class Product(Base):
     price = Column(Float, default=0.0)
     unit = Column(String, nullable=True)  # 扩展字段
      # 在 Product 模型里新增一列
-   
+
+class CollabRoom(Base):
+    __tablename__ = "collab_rooms"
+
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(16), unique=True, index=True)  # 协作码，比如 6 位短码
+    data_json = Column(Text, nullable=False)            # 存整个清单 JSON
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def get_list(self) -> dict:
+        return json.loads(self.data_json)
+
+    def set_list(self, data: dict):
+        self.data_json = json.dumps(data, ensure_ascii=False)

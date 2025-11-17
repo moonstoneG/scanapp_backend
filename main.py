@@ -23,11 +23,11 @@ import pandas as pd
 from sqlalchemy.orm import Session
 from typing import Dict, Any
 import auth
-import models
 from fastapi.staticfiles import StaticFiles
 from fastapi import FastAPI, Form, Depends
 from fastapi.responses import StreamingResponse
 from typing import List
+from models import CollabRoom, CollabItem
 import io
 import auth
 from doc_generate import Payload, Item, generate_doc_local,iter_all_paragraphs, simple_run_replace,replace_core_placeholders,merge_items
@@ -81,19 +81,7 @@ if not db.query(models.User).filter(models.User.username == "admin").first():
     db.commit()
 db.close()
 
-class CollabRoom(Base):
-    __tablename__ = "collab_rooms"
 
-    id = Column(Integer, primary_key=True, index=True)
-    code = Column(String(16), unique=True, index=True)  # 协作码，比如 6 位短码
-    data_json = Column(Text, nullable=False)            # 存整个清单 JSON
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    def get_list(self) -> dict:
-        return json.loads(self.data_json)
-
-    def set_list(self, data: dict):
-        self.data_json = json.dumps(data, ensure_ascii=False)
 
 # --------- Pydantic 模型 ---------
 class ItemModel(BaseModel):
@@ -930,17 +918,3 @@ def delete_item(
 
     lst = db.query(models.ScanList).filter(models.ScanList.id == list_id).first()
     return lst
-
-class CollabRoom(Base):
-    __tablename__ = "collab_rooms"
-
-    id = Column(Integer, primary_key=True, index=True)
-    code = Column(String(16), unique=True, index=True)  # 协作码：ABCDE1
-    data_json = Column(Text, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    def get_list(self) -> dict:
-        return json.loads(self.data_json)
-
-    def set_list(self, data: dict):
-        self.data_json = json.dumps(data, ensure_ascii=False)
