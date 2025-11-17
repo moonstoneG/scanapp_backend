@@ -15,7 +15,60 @@ class UnitCreate(UnitBase):
     pass
 
 
-    
+    id: int
+    sku: str
+    name: str
+    qty: float
+    price: float
+    unit: str
+
+    class Config:
+        from_attributes = True
+
+
+class ScanItemOut(BaseModel):
+    """
+    清单里的商品条目
+    """
+    id: int
+    sku: str
+    name: str
+    qty: float
+    price: float
+    unit: str
+
+    class Config:
+        from_attributes = True
+
+
+# 前端创建清单时使用
+class ListCreate(BaseModel):
+    title: str
+
+
+# 向清单添加商品
+class AddItem(BaseModel):
+    sku: str
+    qty: float
+
+
+# 修改清单条目（数量）
+class UpdateItem(BaseModel):
+    qty: float
+
+
+class ScanListOut(BaseModel):
+    """
+    一个完整的清单（包含所有条目）
+    """
+    id: str
+    title: str
+    created_by: Optional[str] = None
+    items: List[ScanItemOut] = []
+
+    class Config:
+        from_attributes = True
+
 class DocItem(BaseModel):
     sku: str
     name: str

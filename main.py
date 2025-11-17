@@ -90,6 +90,16 @@ class DocPayload(BaseModel):
     behavior: str
     items: List[ItemModel]
 
+class ListCreate(BaseModel):
+    title: str
+
+class AddItem(BaseModel):
+    sku: str
+    qty: float = 1.0
+
+class UpdateItem(BaseModel):
+    qty: float
+    
 
 class UserCreate(BaseModel):
     username: str
@@ -719,3 +729,96 @@ class ScanItem(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     list = relationship("ScanList", back_populates="items")
+
+
+@app.post("/api/lists", summary="创建协作清单")
+def create_list(
+    payload: ListCreate,
+    db: Session = Depends(get_db),
+    user=Depends(auth.get_current_user)
+):
+    title = payload.title.strip()
+    if not title:
+        raise HTTPException(400, "清单名称不能为空")
+
+    new_list = models.ScanList(
+        title=title,
+        created_by=user.username
+    )
+
+    db.add(new_list)
+    db.commit()
+    db.refresh(new_list)
+
+    return {
+        "list_id": new_list.id,
+        "title": new_list.title,
+        "created_by": new_list.created_by
+    }
+
+@app.get("/api/lists/{list_id}", response_model=schemas.ScanListOut, summary="获取清单详情")
+def get_list(list_id: str, db: Session = Depends(get_db), _=Depends(auth.get_current_user)):
+    lst = db.query(models.ScanList).filter(models.ScanList.id == list_id).first()
+    if not lst:
+        raise HTTPException(404, "清单不存在")
+    return lst
+
+@app.post("/api/lists/{list_id}/items", response_model=schemas.ScanListOut, summary="向清单添加商品")
+def add_item_to_list(
+    list_id: str,
+    payload: AddItem,
+    db: Session = Depends(get_db),
+    _=Depends(auth.get_current_user)
+):
+    lst = db.query(models.ScanList).filter(models.ScanList.id == list_id).first()
+    if not lst:
+        raise HTTPException(404, "清单不存在")
+
+    product = db.query(models.Product).filter(models.Product.sku == payload.sku).first()
+    if not product:
+        raise HTTPException(404, f"SKU {payload.sku} 未在商品库中找到")
+
+    # 是否已有当前 SKU
+    existing = db.query(models.ScanItem).filter(
+        models.ScanItem.list_id == list_id,
+        models.ScanItem.sku == payload.sku
+    ).first()
+
+    if existing:
+        existing.qty += payload.qty
+        existing.updated_at = func.now()
+    else:
+        new_item = models.ScanItem(
+            list_id=list_id,
+            sku=product.sku,
+            name=product.name,
+            price=product.price or 0,
+            unit=product.unit or "条",
+            qty=payload.qty
+        )
+        db.add(new_item)
+
+    db.commit()
+
+    return lst
+
+@app.delete("/api/lists/{list_id}/items/{item_id}", response_model=schemas.ScanListOut, summary="删除条目")
+def delete_item(
+    list_id: str,
+    item_id: int,
+    db: Session = Depends(get_db),
+    _=Depends(auth.get_current_user)
+):
+    item = db.query(models.ScanItem).filter(
+        models.ScanItem.id == item_id,
+        models.ScanItem.list_id == list_id
+    ).first()
+
+    if not item:
+        raise HTTPException(404, "条目不存在")
+
+    db.delete(item)
+    db.commit()
+
+    lst = db.query(models.ScanList).filter(models.ScanList.id == list_id).first()
+    return lst
