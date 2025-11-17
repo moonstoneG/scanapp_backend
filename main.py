@@ -190,8 +190,10 @@ def collab_create(
     code = gen_code()
     while db.query(CollabRoom).filter_by(code=code).first():
         code = gen_code()
-
-    room = CollabRoom(code=code, data_json=body.model_dump_json(ensure_ascii=False))
+    room = CollabRoom(
+    code=code,
+    data_json=json.dumps(body.model_dump(), ensure_ascii=False)
+)
     db.add(room)
     db.commit()
     return {"code": code}
