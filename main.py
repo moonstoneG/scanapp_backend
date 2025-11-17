@@ -27,7 +27,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi import FastAPI, Form, Depends
 from fastapi.responses import StreamingResponse
 from typing import List
-from models import CollabRoom, CollabItem
+from models import CollabRoom
 import io
 import auth
 from doc_generate import Payload, Item, generate_doc_local,iter_all_paragraphs, simple_run_replace,replace_core_placeholders,merge_items
