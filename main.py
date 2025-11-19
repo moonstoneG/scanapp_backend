@@ -245,7 +245,7 @@ def delete_item(code: str, sku: str, db: Session = Depends(get_db)):
     db.commit()
     return {"success": True, "items": data["items"]}
 
-@app.post("/collab/submit/{code}")
+@app.post("/api/collab/submit/{code}")
 def submit_collab(
     code: str,
     body: schemas.CollabList,
@@ -298,7 +298,7 @@ def submit_collab(
     }
 # collab_router.py
 
-@app.get("/collab/status/{code}")
+@app.get("/api/collab/status/{code}")
 def collab_status(code: str, db: Session = Depends(get_db)):
     submissions = db.query(CollabSubmission).filter_by(code=code).count()
 
@@ -326,9 +326,9 @@ def merge_item_lists(all_items: List[List[dict]]) -> List[dict]:
                 merged[sku]["qty"] += float(it.get("qty") or 0)
     return list(merged.values())
 
-@app.get("/collab/check/{code}")
+@app.get("/api/collab/check/{code}")
 async def check_collab_code(code: str):
-    exists = get_room(db,code)  # ← 你自己的判断方法
+    exists = db.query(CollabRoom).filter_by(code=code).first()
     return {"ok": bool(exists)}
 
 def get_room(db: Session, code: str) -> CollabRoom:
