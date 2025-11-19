@@ -328,8 +328,11 @@ def merge_item_lists(all_items: List[List[dict]]) -> List[dict]:
 
 @app.get("/api/collab/check/{code}")
 async def check_collab_code(code: str):
-    exists = db.query(CollabRoom).filter_by(code=code).first()
-    return {"ok": bool(exists)}
+    room = db.query(CollabRoom).filter_by(code=code).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="协作码不存在")
+
+    
 
 def get_room(db: Session, code: str) -> CollabRoom:
     room = db.query(CollabRoom).filter_by(code=code).first()
