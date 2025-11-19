@@ -327,11 +327,12 @@ def merge_item_lists(all_items: List[List[dict]]) -> List[dict]:
     return list(merged.values())
 
 @app.get("/api/collab/check/{code}")
-async def check_collab_code(code: str):
+def check_collab_code(
+    code: str,
+    db: Session = Depends(get_db)           # ← 必加
+):
     room = db.query(CollabRoom).filter_by(code=code).first()
-    if not room:
-        raise HTTPException(status_code=404, detail="协作码不存在")
-
+    return {"ok": room is not None}        # ← 不要 raise
     
 
 def get_room(db: Session, code: str) -> CollabRoom:
