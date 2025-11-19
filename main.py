@@ -328,7 +328,7 @@ def merge_item_lists(all_items: List[List[dict]]) -> List[dict]:
 
 @app.get("/collab/check/{code}")
 async def check_collab_code(code: str):
-    exists = get_room(code)  # ← 你自己的判断方法
+    exists = get_room(db,code)  # ← 你自己的判断方法
     return {"ok": bool(exists)}
 
 def get_room(db: Session, code: str) -> CollabRoom:
