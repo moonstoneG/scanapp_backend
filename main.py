@@ -44,6 +44,7 @@ logging.basicConfig(level=logging.INFO)
 from sqlalchemy import Column, Integer, String, Text, DateTime
 from datetime import datetime
 import json
+from models import CollabRoom, CollabSubmission
 # ---------------- 数据库初始化 ----------------
 models.Base.metadata.create_all(bind=engine)
 # --- 放在 main.py 里 ---
@@ -59,7 +60,7 @@ VERSION_FILE = os.path.join(os.path.dirname(__file__), "version.json")
 ACCESS_EXPIRE_MINUTES = getattr(auth, "ACCESS_TOKEN_EXPIRE_MINUTES", 60)
 # 确保有默认 admin 用户
 from auth import get_password_hash
-
+COLLAB_MIN_USERS = 2
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # 密码哈希
@@ -231,6 +232,117 @@ def collab_get(
     if not room:
         raise HTTPException(status_code=404, detail="协作码不存在")
     return room.get_list()
+
+@app.post("/collab/delete/{code}/{sku}")
+def delete_item(code: str, sku: str, db: Session = Depends(get_db)):
+    room = get_room(db, code)          # 找协作房间
+    data = room.get_list()             # JSON 转 dict
+
+    # 过滤掉被删除的商品
+    data["items"] = [item for item in data["items"] if item["sku"] != sku]
+
+    room.set_list(data)                # 保存 JSON
+    db.commit()
+    return {"success": True, "items": data["items"]}
+
+@app.post("/collab/save/{code}")
+def save_collab(code: str, data: CollabRoom, db: Session = Depends(get_db)):
+    room = get_room(db, code)        # 查房间
+    room.set_list(data.dict())       # 全部覆盖
+    db.commit()
+    return {"success": True}
+
+@app.post("/collab/submit/{code}")
+def submit_collab(
+    code: str,
+    body: schemas.CollabList,
+    db: Session = Depends(get_db),
+    _=Depends(auth.get_current_user)
+):
+    # 1️⃣ 校验协作码是否存在
+    room = db.query(CollabRoom).filter_by(code=code).first()
+    if not room:
+        raise HTTPException(404, "协作码不存在")
+
+    # 2️⃣ 写入一次提交记录
+    sub = CollabSubmission(
+        code=code,
+        items_json=json.dumps(body.model_dump()["items"], ensure_ascii=False)
+    )
+    db.add(sub)
+    db.commit()
+
+    # 3️⃣ 查询当前共有多少人提交
+    submissions = db.query(CollabSubmission).filter_by(code=code).all()
+    count = len(submissions)
+
+    # 4️⃣ 未达到人数，不合并
+    if count < COLLAB_MIN_USERS:
+        return {
+            "allConfirmed": False,
+            "pending": COLLAB_MIN_USERS - count
+        }
+
+    # 5️⃣ 达到人数 → 读取所有 items → 合并
+    all_items = [json.loads(s.items_json) for s in submissions]
+    merged_items = merge_item_lists(all_items)   # 你已有的函数
+
+    # 6️⃣ 覆盖协作房间的清单内容
+    data = room.get_list()
+    data["items"] = merged_items
+    room.set_list(data)
+    db.commit()
+
+    # 7️⃣ 清除所有提交记录（为下一次协作做准备）
+    db.query(CollabSubmission).filter_by(code=code).delete()
+    db.commit()
+
+    return {
+        "allConfirmed": True,
+        "id": room.id,
+        "name": data["name"],
+        "items": merged_items
+    }
+# collab_router.py
+
+@app.get("/collab/status/{code}")
+def collab_status(code: str, db: Session = Depends(get_db)):
+    submissions = db.query(CollabSubmission).filter_by(code=code).count()
+
+    return {
+        "allConfirmed": submissions >= COLLAB_MIN_USERS,
+        "pending": max(0, COLLAB_MIN_USERS - submissions)
+    }
+
+def merge_item_lists(all_items: List[List[dict]]) -> List[dict]:
+    merged = {}
+    for items in all_items:
+        for it in items:
+            sku = it.get("sku") or it.get("name")
+            if not sku:
+                continue
+            if sku not in merged:
+                merged[sku] = {
+                    "sku": it.get("sku"),
+                    "name": it.get("name"),
+                    "unit": it.get("unit"),
+                    "price": float(it.get("price") or 0),
+                    "qty": float(it.get("qty") or 0),
+                }
+            else:
+                merged[sku]["qty"] += float(it.get("qty") or 0)
+    return list(merged.values())
+
+@app.get("/collab/check/{code}")
+async def check_collab_code(code: str):
+    exists = get_room(code)  # ← 你自己的判断方法
+    return {"ok": bool(exists)}
+
+def get_room(db: Session, code: str) -> CollabRoom:
+    room = db.query(CollabRoom).filter_by(code=code).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="协作码不存在")
+    return room
 # ---------------- 登录 ----------------
 @app.post("/api/token")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):

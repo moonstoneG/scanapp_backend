@@ -1,6 +1,6 @@
 from datetime import datetime
 import json
-from sqlalchemy import Column, DateTime, Integer, String, Float, Boolean, ForeignKey, Text
+from sqlalchemy import Column, DateTime, Integer, String, Float, Boolean, ForeignKey, Text, func
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -43,3 +43,11 @@ class CollabRoom(Base):
 
     def set_list(self, data: dict):
         self.data_json = json.dumps(data, ensure_ascii=False)
+
+class CollabSubmission(Base):
+    __tablename__ = "collab_submissions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    code = Column(String, index=True)        # 协作码
+    items_json = Column(Text, nullable=False)  # 用户提交的本地 items
+    created_at = Column(DateTime, server_default=func.now())
