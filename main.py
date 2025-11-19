@@ -180,11 +180,13 @@ def gen_code(length=6):
 
 app.mount("/scanapp/static", StaticFiles(directory="static"), name="static")
 
+class CollabCreateReq(BaseModel):
+    title: str  
 
 # ① 创建协作清单：上传本地清单 → 返回协作码
 @app.post("/api/collab/create")
 def collab_create(
-    body: schemas.CollabList,      # ❌ 之前强制要 items
+    body: CollabCreateReq,      # ❌ 之前强制要 items
     db: Session = Depends(get_db),
     _=Depends(auth.get_current_user)
 ):
@@ -1029,7 +1031,7 @@ def delete_item(
 
     lst = db.query(models.ScanList).filter(models.ScanList.id == list_id).first()
     return lst
-    
+
 for r in app.router.routes:
     print(f"ROUTE: {r.path}")
     
