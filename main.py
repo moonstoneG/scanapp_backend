@@ -138,7 +138,9 @@ app.include_router(users_router, prefix="/api/users")
 for r in app.router.routes:
     logger.info(f"Route: path={r.path}, name={r.name}")
 
-
+for r in app.router.routes:
+    print(f"ROUTE: {r.path}")
+    
 def merge_lists(base: dict, incoming: dict) -> dict:
     """
     base / incoming 都是 CollabList 的 dict 结构：
