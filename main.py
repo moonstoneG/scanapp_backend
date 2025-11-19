@@ -184,19 +184,19 @@ app.mount("/scanapp/static", StaticFiles(directory="static"), name="static")
 # ① 创建协作清单：上传本地清单 → 返回协作码
 @app.post("/api/collab/create")
 def collab_create(
-    body: schemas.CollabList,
+    body: schemas.CollabList,      # ❌ 之前强制要 items
     db: Session = Depends(get_db),
     _=Depends(auth.get_current_user)
 ):
     code = gen_code()
-    while db.query(CollabRoom).filter_by(code=code).first():
-        code = gen_code()
+
     room = CollabRoom(
-    code=code,
-    data_json=json.dumps(body.model_dump(), ensure_ascii=False)
-)
+        code=code,
+        data_json=json.dumps({"id": code, "name": body.title, "items": []}, ensure_ascii=False)   # 🔥 只建空房间
+    )
     db.add(room)
     db.commit()
+
     return {"code": code}
 
 
