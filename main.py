@@ -245,13 +245,6 @@ def delete_item(code: str, sku: str, db: Session = Depends(get_db)):
     db.commit()
     return {"success": True, "items": data["items"]}
 
-@app.post("/collab/save/{code}")
-def save_collab(code: str, data: CollabRoom, db: Session = Depends(get_db)):
-    room = get_room(db, code)        # 查房间
-    room.set_list(data.dict())       # 全部覆盖
-    db.commit()
-    return {"success": True}
-
 @app.post("/collab/submit/{code}")
 def submit_collab(
     code: str,
