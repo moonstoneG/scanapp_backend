@@ -285,6 +285,7 @@ def submit_collab(
     # 6️⃣ 覆盖协作房间的清单内容
     data = room.get_list()
     data["items"] = merged_items
+    data["lastMergedAt"] = datetime.utcnow().isoformat()  # 记录最近一次合并时间
     room.set_list(data)
     db.commit()
 
@@ -302,10 +303,19 @@ def submit_collab(
 
 @app.get("/api/collab/status/{code}")
 def collab_status(code: str, db: Session = Depends(get_db)):
+    room = get_room(db, code)
     submissions = db.query(CollabSubmission).filter_by(code=code).count()
 
+    if submissions >= COLLAB_MIN_USERS:
+        return {"allConfirmed": True, "pending": 0}
+
+    # 如果没有提交记录，但已存在最近一次合并标记，则视为已合并完成（防止 pending 掉回 2）
+    data = room.get_list()
+    if submissions == 0 and data.get("lastMergedAt"):
+        return {"allConfirmed": True, "pending": 0}
+
     return {
-        "allConfirmed": submissions >= COLLAB_MIN_USERS,
+        "allConfirmed": False,
         "pending": max(0, COLLAB_MIN_USERS - submissions)
     }
 
