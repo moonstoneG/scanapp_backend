@@ -740,13 +740,9 @@ def generate_doc4(
         qty_val = float(qty)
         qty_converted = convert_qty(unit, qty_val)
         payload_items.append(ItemPricing(name, "条", qty_converted, float(price)))
-    #payload_items = merge_items(payload_items)
-    payload = Payload(
-        bureau=bureau,
-        suspect=" ",
-        behavior=" ",
-        items=payload_items
-    )
+    # 核价表必须用 doc_generate2.Payload，内部会按同名合并并保留单价/小计；
+    # 勿用 doc_generate.Payload / doc_generate.merge_items（Item 无 price，会触发 AttributeError）。
+    payload = PayloadPricing(bureau=bureau, items=payload_items)
 
     buf = io.BytesIO()
     generate_doc_pricing(payload, template="涉案物品核价表.docx", output=buf)  # 写入内存
